@@ -63,12 +63,12 @@
                     <button onclick="prosesAbsen('Masuk')" class="bg-emerald-600 hover:bg-emerald-700 text-white p-5 rounded-2xl shadow-sm transition flex flex-col items-center justify-center gap-2 active:scale-95">
                         <i data-lucide="log-in" class="w-8 h-8"></i>
                         <span class="font-semibold text-lg">Absen Masuk</span>
-                        <span class="text-xs text-emerald-100">Batas: 08:00 WIB</span>
+                        <span class="text-xs text-emerald-100">Batas: 07:30 WIB</span>
                     </button>
                     <button onclick="prosesAbsen('Pulang')" class="bg-rose-600 hover:bg-rose-700 text-white p-5 rounded-2xl shadow-sm transition flex flex-col items-center justify-center gap-2 active:scale-95">
                         <i data-lucide="log-out" class="w-8 h-8"></i>
                         <span class="font-semibold text-lg">Absen Pulang</span>
-                        <span class="text-xs text-rose-100">Mulai: 17:00 WIB</span>
+                        <span class="text-xs text-rose-100">Mulai: 16:30 WIB</span>
                     </button>
                 </div>
 
@@ -126,7 +126,7 @@
         // --- KONFIGURASI KANTOR (GEOFENCING) ---
         const KANTOR_LAT = -6.99227672717298;  // Ganti koordinat latitude kantor Anda
         const KANTOR_LON = 110.4288534847692; // Ganti koordinat longitude kantor Anda
-        const RADIUS_MAKSIMAL_METER = 1000; // Jarak toleransi maksimal karyawan dari kantor
+        const RADIUS_MAKSIMAL_METER = 750; // Jarak toleransi maksimal karyawan dari kantor
 
         let userAktif = null;
 
