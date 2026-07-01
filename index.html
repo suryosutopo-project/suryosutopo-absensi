@@ -259,12 +259,29 @@
             }, { enableHighAccuracy: true });
         }
 
-        async function muatStatusHariIni() {
-            const tglHariIni = new Date().toLocaleDateString('en-CA');
-            let { data } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', tglHariIni).maybeSingle();
-            document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
-            document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
-        }
+       async function muatStatusHariIni() {
+    // Cara yang lebih aman dan pasti menghasilkan YYYY-MM-DD di semua HP
+    const sekarang = new Date();
+    const offset = sekarang.getTimezoneOffset();
+    const tglLokal = new Date(sekarang.getTime() - (offset * 60 * 1000));
+    const tglHariIni = tglLokal.toISOString().split('T')[0];
+
+    let { data, error } = await supabaseClient
+        .from('absensi')
+        .select('*')
+        .eq('user_id', userAktif.id)
+        .eq('tanggal', tglHariIni)
+        .maybeSingle();
+        
+    if (error) {
+        console.error("Gagal memuat status hari ini:", error.message);
+        return;
+    }
+
+    // Mengisi teks di kotak halaman karyawan
+    document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
+    document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
+}
 
         async function renderTabelAdmin() {
             let { data: semuaAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
