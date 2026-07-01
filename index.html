@@ -246,13 +246,22 @@
                         lokasi: `${latHP.toFixed(5)}, ${lonHP.toFixed(5)}`
                     });
                     alert(`Absen Masuk Sukses! Status: ${statusAbsen}`);
-                } else {
-                    if (!absenHariIni) { alert("Anda belum absen masuk hari ini!"); return; }
-                    if (absenHariIni.jam_pulang) { alert("Anda sudah absen pulang hari ini!"); return; }
-
-                    await supabaseClient.from('absensi').update({ jam_pulang: jamSekarangText }).eq('id', absenHariIni.id);
-                    alert(`Absen Pulang Sukses pada ${jamSekarangText}`);
-                }
+                } else else if (jenis === 'Pulang') {
+    // Validasi 1: Cek apakah karyawan sudah absen masuk hari ini
+    if (!dataHariIni || dataHariIni.jamMasuk === '-') {
+        alert("Anda harus melakukan Absen Masuk terlebih dahulu hari ini!");
+        return;
+    }
+    // Validasi 2: Cek apakah karyawan sudah pernah absen pulang sebelumnya
+    if (dataHariIni.jamPulang !== '-') {
+        alert("Anda sudah melakukan absen pulang hari ini!");
+        return;
+    }
+    
+    // Jika lolos validasi, isi kolom jamPulang dengan jam saat ini
+    dataHariIni.jamPulang = formatJam;
+    alert(`Absen Pulang Berhasil pada pukul ${formatJam}`);
+}
                 muatStatusHariIni();
             }, () => {
                 alert("Nyalakan GPS HP Anda dan izinkan akses lokasi untuk bisa mengabsen.");
