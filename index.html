@@ -13,8 +13,10 @@
     <div id="page-login" class="flex min-h-screen items-center justify-center px-4">
         <div class="w-full max-w-sm space-y-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div class="text-center space-y-2">
-                <div class="flex items-center">                    <img src="https://cdn.phototourl.com/free/2026-06-29-57f23145-8d9c-4194-b236-ed08bb96ab70.png" alt="Logo Perusahaan" class="h-10 w-auto object-contain">
-</div>              <h1 class="text-2xl font-bold text-slate-900">Selamat Datang</h1>
+                <div class="flex items-center justify-center">                    
+                    <img src="https://cdn.phototourl.com/free/2026-06-29-57f23145-8d9c-4194-b236-ed08bb96ab70.png" alt="Logo Perusahaan" class="h-10 w-auto object-contain">
+                </div>              
+                <h1 class="text-2xl font-bold text-slate-900">Selamat Datang</h1>
                 <p class="text-sm text-slate-500">Silahkan masuk ke akun karyawan Anda</p>
             </div>
             <form id="login-form" class="space-y-4">
@@ -118,15 +120,17 @@
     </div>
 
     <script>
-        // --- KONFIGURASI SUPABASE (Ganti dengan kredensial proyek Anda) ---
+        // --- KONFIGURASI SUPABASE ---
         const SUPABASE_URL = "https://czrfgfsktsnvdwmjpzbx.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6cmZnZnNrdHNudmR3bWpwemJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NzkyNTEsImV4cCI6MjA5ODI1NTI1MX0.8xF64JQQZHst1iY-PdO8qWEaeCpF5S5W3cqvU8tyzZY";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // --- KONFIGURASI KANTOR (GEOFENCING) ---
-        const KANTOR_LAT = -6.99227672717298;  // Ganti koordinat latitude kantor Anda
-        const KANTOR_LON = 110.4288534847692; // Ganti koordinat longitude kantor Anda
-        const RADIUS_MAKSIMAL_METER = 750; // Jarak toleransi maksimal karyawan dari kantor
+        const KANTOR_LAT = -6.99227672717298;  
+        const KANTOR_LON = 110.4288534847692; 
+        const RADIUS_MAKSIMAL_METER = 750; 
+        const BATAS_JAM_MASUK = 7; // Jam 07:00 malam/pagi disesuaikan logic jamSekarang.getHours()
+        const BATAS_MENIT_MASUK = 30; // Batas toleransi menit (07:30)
 
         let userAktif = null;
 
@@ -137,17 +141,17 @@
                 document.getElementById('page-login').classList.add('hidden');
                 document.getElementById('app-content').classList.remove('hidden');
                 
-                // Set Nama & Avatar HP
                 const namaUser = userAktif.user_metadata.full_name || userAktif.email;
                 document.getElementById('employee-name').innerText = namaUser;
                 document.getElementById('user-avatar').innerText = namaUser.substring(0,2).toUpperCase();
 
-                // Hak Akses Admin (jika email mengandung domain tertentu / role khusus)
+                // Hak Akses Admin
                 if(userAktif.email.includes('teddy_dapen@yahoo.com')) {
                     document.getElementById('nav-admin').classList.remove('hidden');
                 }
 
                 muatStatusHariIni();
+                lucide.createIcons();
             } else {
                 document.getElementById('page-login').classList.remove('hidden');
                 document.getElementById('app-content').classList.add('hidden');
@@ -171,11 +175,11 @@
         function updateWaktu() {
             const sekarang = new Date();
             document.getElementById('live-clock').innerText = sekarang.toLocaleTimeString('id-ID', { hour12: false }).replace(/\./g, ':');
-            document.getElementById('live-date').innerText = sekarang.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('live-date').innerText = navigator.geolocation ? sekarang.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : "Mencari...";
         }
         setInterval(updateWaktu, 1000); updateWaktu();
 
-        // --- Rumus Haversine (Hitung Jarak Valid Akurat GPS HP ke Kantor) ---
+        // --- Rumus Haversine (Hitung Jarak GPS) ---
         function hitungJarak(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
             const p1 = lat1 * Math.PI / 180;
@@ -184,6 +188,37 @@
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dLon/2) * Math.sin(dLon/2);
             return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        // --- Fungsi Utama Pembaca GPS (Menyelesaikan Masalah Tombol Macet) ---
+        function dapatkanLokasi(callback) {
+            if (!navigator.geolocation) {
+                alert("Browser HP Anda tidak mendukung fitur GPS.");
+                return;
+            }
+            document.getElementById('location-status').innerText = "Sedang mengunci lokasi GPS Anda...";
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const koordinat = `${lat}, ${lon}`;
+                    
+                    const jarak = hitungJarak(lat, lon, KANTOR_LAT, KANTOR_LON);
+                    document.getElementById('location-status').innerText = `Jarak Anda: ${jarak.toFixed(0)} meter dari kantor.`;
+
+                    if (jarak > RADIUS_MAKSIMAL_METER) {
+                        alert(`Gagal Absen! Jarak Anda ${jarak.toFixed(0)} meter dari kantor. Maksimal toleransi ${RADIUS_MAKSIMAL_METER} meter.`);
+                        return;
+                    }
+                    callback(koordinat);
+                },
+                (error) => {
+                    document.getElementById('location-status').innerText = "Gagal mengambil lokasi GPS.";
+                    alert("Akses GPS ditolak/gagal. Harap izinkan lokasi di pengaturan browser HP Anda.");
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
 
         // --- Navigasi Halaman ---
@@ -201,115 +236,111 @@
 
         // --- Proses Absen ---
         function prosesAbsen(jenis) {
-    const sekarang = new Date();
-    
-    // Perbaikan format tanggal yang aman untuk semua HP
-    const offset = sekarang.getTimezoneOffset();
-    const tglLokal = new Date(sekarang.getTime() - (offset * 60 * 1000));
-    const formatTanggal = tglLokal.toISOString().split('T')[0]; // Hasil: YYYY-MM-DD
-    
-    // Perbaikan format jam yang aman untuk semua HP
-    const jam = String(sekarang.getHours()).padStart(2, '0');
-    const menit = String(sekarang.getMinutes()).padStart(2, '0');
-    const formatJam = `${jam}:${menit}`;
-
-    dapatkanLokasi(async (koordinat) => {
-        // Tarik data dari database Supabase
-        let { data: dataHariIni, error: errorFetch } = await supabaseClient
-            .from('absensi')
-            .select('*')
-            .eq('user_id', userAktif.id)
-            .eq('tanggal', formatTanggal)
-            .maybeSingle();
-
-        if (errorFetch) {
-            console.error("Gagal memeriksa data:", errorFetch.message);
-            return;
-        }
-
-        if (jenis === 'Masuk') {
-            if (dataHariIni && dataHariIni.jam_masuk) {
-                alert("Anda sudah melakukan absen masuk hari ini!");
-                return;
-            }
-
-            // Tentukan status tepat waktu atau terlambat
-            const jamSekarang = sekarang.getHours();
-            const status = jamSekarang < BATAS_JAM_MASUK ? 'Tepat Waktu' : 'Terlambat';
-
-            // Simpan absen masuk ke Supabase
-            const { error: errorInsert } = await supabaseClient
-                .from('absensi')
-                .insert({
-                    user_id: userAktif.id,
-                    nama: userAktif.user_metadata.full_name || userAktif.email,
-                    tanggal: formatTanggal,
-                    jam_masuk: formatJam,
-                    status: status,
-                    lokasi: koordinat
-                });
-
-            if (errorInsert) {
-                alert("Gagal absen masuk: " + errorInsert.message);
-            } else {
-                alert(`Absen Masuk Berhasil (${status}) pada pukul ${formatJam}`);
-            }
-
-        } else if (jenis === 'Pulang') { // <--- Di sinilah letak perbaikan kurung kurawal 'else if' tersebut
-            if (!dataHariIni || !dataHariIni.jam_masuk) {
-                alert("Anda harus melakukan Absen Masuk terlebih dahulu hari ini!");
-                return;
-            }
-            if (dataHariIni.jam_pulang) {
-                alert("Anda sudah melakukan absen pulang hari ini!");
-                return;
-            }
-
-            // Update data absen pulang ke Supabase berdasarkan ID baris hari ini
-            const { error: errorUpdate } = await supabaseClient
-                .from('absensi')
-                .update({ jam_pulang: formatJam })
-                .eq('id', dataHariIni.id);
-
-            if (errorUpdate) {
-                alert("Gagal absen pulang: " + errorUpdate.message);
-            } else {
-                alert(`Absen Pulang Berhasil pada pukul ${formatJam}`);
-            }
-        }
-
-        // Muat ulang status tampilan di HP karyawan setelah absen
-        muatStatusHariIni();
-            }, () => {
-                alert("Nyalakan GPS HP Anda dan izinkan akses lokasi untuk bisa mengabsen.");
-            }, { enableHighAccuracy: true });
-        }
-
-       async function muatStatusHariIni() {
-    try {
-        const sekarang = new Date();
-        const offset = ahora = sekarang.getTimezoneOffset();
-        const tglLokal = new Date(sekarang.getTime() - (offset * 60 * 1000));
-        const tglHariIni = tglLokal.toISOString().split('T')[0];
-
-        let { data, error } = await supabaseClient
-            .from('absensi')
-            .select('*')
-            .eq('user_id', userAktif.id)
-            .eq('tanggal', tglHariIni)
-            .maybeSingle();
+            const sekarang = new Date();
+            const offset = sekarang.getTimezoneOffset();
+            const tglLokal = new Date(sekarang.getTime() - (offset * 60 * 1000));
+            const formatTanggal = tglLokal.toISOString().split('T')[0]; 
             
-        if (error) throw error;
+            const jam = String(sekarang.getHours()).padStart(2, '0');
+            const menit = String(sekarang.getMinutes()).padStart(2, '0');
+            const formatJam = `${jam}:${menit}`;
 
-        // Tampilkan ke teks HTML halaman karyawan
-        document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
-        document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
-    } catch (err) {
-        console.error("Gagal memuat status tampilan:", err.message);
-    }
-}
+            dapatkanLokasi(async (koordinat) => {
+                let { data: dataHariIni, error: errorFetch } = await supabaseClient
+                    .from('absensi')
+                    .select('*')
+                    .eq('user_id', userAktif.id)
+                    .eq('tanggal', formatTanggal)
+                    .maybeSingle();
+
+                if (errorFetch) {
+                    alert("Gagal koneksi database: " + errorFetch.message);
+                    return;
+                }
+
+                if (jenis === 'Masuk') {
+                    if (dataHariIni && dataHariIni.jam_masuk) {
+                        alert("Anda sudah melakukan absen masuk hari ini!");
+                        return;
+                    }
+
+                    // Logika jam masuk (Terlambat jika lewat dari 07:30)
+                    let status = 'Tepat Waktu';
+                    if (sekarang.getHours() > BATAS_JAM_MASUK || (sekarang.getHours() === BATAS_JAM_MASUK && sekarang.getMinutes() > BATAS_MENIT_MASUK)) {
+                        status = 'Terlambat';
+                    }
+
+                    const { error: errorInsert } = await supabaseClient
+                        .from('absensi')
+                        .insert({
+                            user_id: userAktif.id,
+                            nama: userAktif.user_metadata.full_name || userAktif.email,
+                            tanggal: formatTanggal,
+                            jam_masuk: formatJam,
+                            status: status,
+                            lokasi: koordinat
+                        });
+
+                    if (errorInsert) {
+                        alert("Gagal simpan data: " + errorInsert.message);
+                    } else {
+                        alert(`Absen Masuk Berhasil (${status}) pada pukul ${formatJam}`);
+                    }
+
+                } else if (jenis === 'Pulang') {
+                    if (!dataHariIni || !dataHariIni.jam_masuk) {
+                        alert("Anda harus melakukan Absen Masuk terlebih dahulu hari ini!");
+                        return;
+                    }
+                    if (dataHariIni.jam_pulang) {
+                        alert("Anda sudah melakukan absen pulang hari ini!");
+                        return;
+                    }
+
+                    const { error: errorUpdate } = await supabaseClient
+                        .from('absensi')
+                        .update({ jam_pulang: formatJam })
+                        .eq('id', dataHariIni.id);
+
+                    if (errorUpdate) {
+                        alert("Gagal simpan data pulang: " + errorUpdate.message);
+                    } else {
+                        alert(`Absen Pulang Berhasil pada pukul ${formatJam}`);
+                    }
+                }
+                muatStatusHariIni();
+            });
+        }
+
+        // --- Memuat Status Hari Ini ---
+        async function muatStatusHariIni() {
+            if (!userAktif) return;
+            try {
+                const sekarang = new Date();
+                const offset = sekarang.getTimezoneOffset();
+                const tglLokal = new Date(sekarang.getTime() - (offset * 60 * 1000));
+                const tglHariIni = tglLokal.toISOString().split('T')[0];
+
+                let { data, error } = await supabaseClient
+                    .from('absensi')
+                    .select('*')
+                    .eq('user_id', userAktif.id)
+                    .eq('tanggal', tglHariIni)
+                    .maybeSingle();
+                    
+                if (error) throw error;
+
+                document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
+                document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
+            } catch (err) {
+                console.error("Gagal memuat status tampilan:", err.message);
+            }
+        }
+
+        // --- Render Tabel Admin ---
         async function renderTabelAdmin() {
-            let { data: semuaAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
+            let { data: semuaAbsen, error } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
+            if (error) { console.error(error); return; }
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
             semuaAbsen?.forEach(item => {
@@ -324,6 +355,11 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // --- Ekspor CSV ---
+        function eksporCSV() {
+            alert("Fitur ekspor CSV siap dikembangkan sesuai kebutuhan data.");
         }
     </script>
 </body>
