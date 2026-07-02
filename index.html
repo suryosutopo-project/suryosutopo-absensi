@@ -468,7 +468,7 @@
             }
         }
 
-      async function muatRiwayatCutiKaryawan() {
+     async function muatRiwayatCutiKaryawan() {
     let { data: listCuti } = await supabaseClient.from('pengajuan_cuti').select('*').eq('user_id', userAktif.id).order('created_at', { ascending: false });
     const tbody = document.getElementById('table-cuti-karyawan-body');
     tbody.innerHTML = '';
@@ -479,7 +479,6 @@
         // --- AWAL KODE TAMBAHAN UNTUK TOMBOL CETAK ---
         let tombolAksi = '';
         if (c.status === 'Approved') {
-            // Data objek 'c' diubah ke teks JSON yang aman agar bisa dikirim ke fungsi cetak
             const dataAman = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
             tombolAksi = `<button onclick="cetakFormulirCuti('${dataAman}')" class="ml-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-medium px-2 py-0.5 rounded transition inline-flex items-center gap-1 cursor-pointer">Cetak Form</button>`;
         }
@@ -490,7 +489,7 @@
                 <td class="p-3 font-medium text-slate-700">${c.jenis_cuti}</td>
                 <td class="p-3 text-xs text-slate-500">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td>
                 <td class="p-3 text-slate-600">${c.alasan}</td>
-                <td class="p-3 flex items-center">${減span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span> ${tombolAksi}</td>
+                <td class="p-3 flex items-center"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span> ${tombolAksi}</td>
             </tr>
         `;
     });
