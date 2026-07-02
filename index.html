@@ -468,29 +468,33 @@
             }
         }
 
-        async function muatRiwayatCutiKaryawan() {
-            let { data: listCuti } = await supabaseClient.from('pengajuan_cuti').select('*').eq('user_id', userAktif.id).order('created_at', { ascending: false });
-            const tbody = document.getElementById('table-cuti-karyawan-body');
-            tbody.innerHTML = '';
-            listCuti?.forEach(c => {
-              let badgeColor = c.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : c.status === 'Rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
+      async function muatRiwayatCutiKaryawan() {
+    let { data: listCuti } = await supabaseClient.from('pengajuan_cuti').select('*').eq('user_id', userAktif.id).order('created_at', { ascending: false });
+    const tbody = document.getElementById('table-cuti-karyawan-body');
+    tbody.innerHTML = '';
     
-    // TAMBAHKAN LOGIKA TOMBOL CETAK JIKA APPROVED
-    let tombolAksi = '';
-    if (c.status === 'Approved') {
-        tombolAksi = `<button onclick="cetakFormulirCuti(${JSON.stringify(c).replace(/"/g, '&quot;')})" class="ml-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2 py-1 rounded transition flex items-center gap-1 inline-block"><i data-lucide="printer" class="w-3 h-3"></i> Cetak Form</button>`;
-    }
-
-    tbody.innerHTML += `
-        <tr>
-            <td class="p-3 font-medium text-slate-700">${c.jenis_cuti}</td>
-            <td class="p-3 text-xs text-slate-500">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td>
-            <td class="p-3 text-slate-600">${c.alasan}</td>
-            <td class="p-3 flex items-center">${減span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span> ${tombolAksi}</td>
-        </tr>
-    `;
-});
+    listCuti?.forEach(c => {
+        let badgeColor = c.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : c.status === 'Rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
+        
+        // --- AWAL KODE TAMBAHAN UNTUK TOMBOL CETAK ---
+        let tombolAksi = '';
+        if (c.status === 'Approved') {
+            // Data objek 'c' diubah ke teks JSON yang aman agar bisa dikirim ke fungsi cetak
+            const dataAman = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
+            tombolAksi = `<button onclick="cetakFormulirCuti('${dataAman}')" class="ml-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-medium px-2 py-0.5 rounded transition inline-flex items-center gap-1 cursor-pointer">Cetak Form</button>`;
         }
+        // --- AKHIR KODE TAMBAHAN UNTUK TOMBOL CETAK ---
+
+        tbody.innerHTML += `
+            <tr>
+                <td class="p-3 font-medium text-slate-700">${c.jenis_cuti}</td>
+                <td class="p-3 text-xs text-slate-500">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td>
+                <td class="p-3 text-slate-600">${c.alasan}</td>
+                <td class="p-3 flex items-center">${減span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span> ${tombolAksi}</td>
+            </tr>
+        `;
+    });
+}
 
         // --- Logika Panel Admin ---
         async function renderTabelAdmin() {
@@ -601,6 +605,126 @@
 
         function eksporCSV() {
             alert("Fitur Ekspor CSV siap dikembangkan.");
+        }
+   // =========================================================================
+        // TEMPATKAN KODE BARU: FUNGSI TAMBAHAN UNTUK PROSES CETAK FORMULIR CUTI
+        // =========================================================================
+        function cetakFormulirCuti(stringBase64) {
+            // Mendekode kembali data objek cuti yang dikirim dari tombol
+            const dataCuti = JSON.parse(decodeURIComponent(escape(atob(stringBase64))));
+
+            const formatIndo = (dateStr) => {
+                if(!dateStr) return '-';
+                const opsi = { year: 'numeric', month: 'long', day: 'numeric' };
+                return new Date(dateStr).toLocaleDateString('id-ID', { ...opsi, timeZone: 'UTC' });
+            };
+
+            const hitungHari = (mulai, selesai) => {
+                const m = new Date(mulai);
+                const s = new Date(selesai);
+                const diffTime = Math.abs(s - m);
+                return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            };
+
+            const jendelaCetak = window.open('', '_blank', 'width=800,height=900');
+            
+            jendelaCetak.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Formulir Cuti Resmi - ${dataCuti.nama}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 40px; color: #333; line-height: 1.5; }
+                        .kop-surat { text-align: center; border-bottom: 3px double #000; padding-bottom: 15px; margin-bottom: 30px; }
+                        .kop-surat h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px; }
+                        .kop-surat p { margin: 5px 0 0 0; font-size: 12px; color: #666; }
+                        .judul-form { text-align: center; text-decoration: underline; font-size: 16px; font-weight: bold; margin-bottom: 25px; text-transform: uppercase;}
+                        .tabel-data { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+                        .tabel-data td { padding: 8px 5px; vertical-align: top; font-size: 14px; }
+                        .tabel-data td.label { width: 30%; font-weight: bold; }
+                        .tabel-data td.titik-dua { width: 3%; }
+                        .box-status { border: 2px solid #059669; background-color: #ecfdf5; padding: 15px; border-radius: 8px; margin-bottom: 40px; text-align: center; }
+                        .box-status h3 { margin: 0 0 5px 0; color: #059669; font-size: 14px; text-transform: uppercase; }
+                        .box-status p { margin: 0; font-size: 13px; color: #065f46; font-weight: bold; }
+                        .tabel-ttd { width: 100%; margin-top: 50px; }
+                        .tabel-ttd td { text-align: center; font-size: 14px; width: 50%; }
+                        .stempel-digital { border: 2px dashed #059669; color: #059669; width: 160px; padding: 8px; margin: 15px auto; font-weight: bold; font-size: 11px; transform: rotate(-3deg); border-radius: 4px; text-transform: uppercase; font-family: 'Courier New', monospace; }
+                        @media print {
+                            body { padding: 20px; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="kop-surat">
+                        <h1>Dana Pensiun Bank Jateng</h1>
+                        <p>Gedung Grha Dapen Bank Jateng, Jl. Jend. Sudirman No. 123, Semarang</p>
+                    </div>
+                    
+                    <div class="judul-form">Formulir Pengajuan & Persetujuan Cuti</div>
+                    
+                    <table class="tabel-data">
+                        <tr>
+                            <td class="label">Nama Pegawai</td>
+                            <td class="titik-dua">:</td>
+                            <td>${dataCuti.nama}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">NIP / No. Urut</td>
+                            <td class="titik-dua">:</td>
+                            <td>${dataCuti.nip || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Jenis Cuti</td>
+                            <td class="titik-dua">:</td>
+                            <td>${dataCuti.jenis_cuti}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Durasi Cuti</td>
+                            <td class="titik-dua">:</td>
+                            <td>${hitungHari(dataCuti.tanggal_mulai, dataCuti.tanggal_selesai)} Hari Kerja</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Tanggal Pelaksanaan</td>
+                            <td class="titik-dua">:</td>
+                            <td>${formatIndo(dataCuti.tanggal_mulai)} s/d ${formatIndo(dataCuti.tanggal_selesai)}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Alasan Pengajuan</td>
+                            <td class="titik-dua">:</td>
+                            <td>${dataCuti.alasan}</td>
+                        </tr>
+                    </table>
+
+                    <div class="box-status">
+                        <h3>Status Dokumen: VERIFIED & APPROVED</h3>
+                        <p>Permohonan cuti ini telah disetujui secara resmi oleh sistem manajemen absensi Dapen Bank Jateng.</p>
+                    </div>
+
+                    <table class="tabel-ttd">
+                        <tr>
+                            <td>
+                                Pemohon,<br><br><br><br><br>
+                                <strong>( ${dataCuti.nama} )</strong>
+                            </td>
+                            <td>
+                                Mengetahui / Menyetujui,<br>
+                                <strong>Direksi / Admin Dapen</strong>
+                                <div class="stempel-digital">
+                                    APPROVED BY SYSTEM<br>
+                                    DAPEN BANK JATENG
+                                </div>
+                                <strong>( Otomatisasi Sistem )</strong>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <script>
+                        window.onload = function() { window.print(); window.close(); }
+                    <\/script>
+                </body>
+                </html>
+            `);
+            jendelaCetak.document.close();
         }
     </script>
 </body>
