@@ -157,7 +157,7 @@
                 document.getElementById('page-login').classList.add('hidden');
                 document.getElementById('app-content').classList.remove('hidden');
                 
-                const namaUser = userAktif.user_metadata.full_name || userAktif.email;
+                const namaUser = userAktif.user_metadata.full_name || userAktif.email.split('@')[0];
                 document.getElementById('employee-name').innerText = namaUser;
                 document.getElementById('user-avatar').innerText = namaUser.substring(0,2).toUpperCase();
 
