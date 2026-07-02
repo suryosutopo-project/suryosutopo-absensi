@@ -232,10 +232,14 @@
                 document.getElementById('user-avatar').innerText = namaUser.substring(0,2).toUpperCase();
 
                 // Deteksi Hak Akses Khusus Akun Admin Pak Teddy
-                if(userAktif.email.includes('0013@dapen.com')) {
-                    document.getElementById('nav-admin').classList.remove('hidden');
-                    document.getElementById('nav-cuti-admin').classList.remove('hidden');
-                }
+               if (userAktif.email === '0013@dapen.com') {
+    document.getElementById('nav-admin').classList.remove('hidden');
+    document.getElementById('nav-cuti-admin').classList.remove('hidden');
+} else {
+    // Pastikan menu admin tersembunyi jika yang login adalah karyawan biasa
+    document.getElementById('nav-admin').classList.add('hidden');
+    document.getElementById('nav-cuti-admin').classList.add('hidden');
+}
 
                 muatStatusHariIni();
                 aktifkanKamera(); 
