@@ -473,16 +473,23 @@
             const tbody = document.getElementById('table-cuti-karyawan-body');
             tbody.innerHTML = '';
             listCuti?.forEach(c => {
-                let badgeColor = c.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : c.status === 'Rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
-                tbody.innerHTML += `
-                    <tr>
-                        <td class="p-3 font-medium text-slate-700">${c.jenis_cuti}</td>
-                        <td class="p-3 text-xs text-slate-500">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td>
-                        <td class="p-3 text-slate-600">${c.alasan}</td>
-                        <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span></td>
-                    </tr>
-                `;
-            });
+              let badgeColor = c.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : c.status === 'Rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
+    
+    // TAMBAHKAN LOGIKA TOMBOL CETAK JIKA APPROVED
+    let tombolAksi = '';
+    if (c.status === 'Approved') {
+        tombolAksi = `<button onclick="cetakFormulirCuti(${JSON.stringify(c).replace(/"/g, '&quot;')})" class="ml-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-2 py-1 rounded transition flex items-center gap-1 inline-block"><i data-lucide="printer" class="w-3 h-3"></i> Cetak Form</button>`;
+    }
+
+    tbody.innerHTML += `
+        <tr>
+            <td class="p-3 font-medium text-slate-700">${c.jenis_cuti}</td>
+            <td class="p-3 text-xs text-slate-500">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td>
+            <td class="p-3 text-slate-600">${c.alasan}</td>
+            <td class="p-3 flex items-center">${減span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span> ${tombolAksi}</td>
+        </tr>
+    `;
+});
         }
 
         // --- Logika Panel Admin ---
