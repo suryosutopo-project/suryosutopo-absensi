@@ -542,14 +542,54 @@
         }
 
         async function prosesPersetujuanCuti(idCuti, statusBaru) {
-            const { error } = await supabaseClient.from('pengajuan_cuti').update({ status: statusBaru }).eq('id', idCuti);
-            if (error) {
-                alert("Gagal memproses persetujuan: " + error.message);
-            } else {
-                alert(`Pengajuan berhasil di-${statusBaru === 'Approved' ? 'SETUJUI' : 'TOLAK'}!`);
-                muatPengajuanCutiAdmin();
-            }
-        }
+    try {
+        // 1. Update status di tabel pengajuan_cuti terlebih dahulu
+        const { error: errorUpdate } = await supabaseClient
+            .from('pengajuan_cuti')
+            .update({ status: statusBaru })
+            .eq('id', idCuti);
+
+        if (errorUpdate) throw errorUpdate;
+
+        // 2. Jika disetujui (Approved), suntik otomatis ke tabel absensi harian
+        if (statusBaru === 'Approved') {
+            // Tarik data detail cuti yang baru saja disetujui
+            let { data: detailCuti } = await supabaseClient
+                .from('pengajuan_cuti')
+                .select('*')
+                .eq('id', idCuti)
+                .single();
+
+            if (detailCuti) {
+                let tanggalMulai = new Date(detailCuti.tanggal_mulai);
+                let tanggalSelesai = new Date(detailCuti.tanggal_selesai);
+
+                // Looping untuk memasukkan data "Cuti" per hari ke tabel absensi
+                let tglJalan = new Date(tanggalMulai);
+                while (tglJalan <= tanggalSelesai) {
+                    const formatTglCuti = tglJalan.toISOString().split('T')[0];
+
+                    // Cek apakah data absen di tanggal itu sudah ada (biar tidak duplikat)
+                    let { data: cekAbsen } = await supabaseClient
+                        .from('absensi')
+                        .select('id')
+                        .eq('user_id', detailCuti.user_id)
+                        .eq('tanggal', formatTglCuti)
+                        .maybeSingle();
+
+                    if (!cekAbsen) {
+                        // Masukkan ke tabel absensi dengan keterangan STATUS = Cuti
+                        await supabaseClient.from('absensi').insert({
+                            user_id: detailCuti.user_id,
+                            nama: detailCuti.nama,
+                            tanggal: formatTglCuti,
+                            jam_masuk: 'CUTI',
+                            jam_pulang: 'CUTI',
+                            status: 'Cuti',
+                            lokasi: 'Izin Cuti Resmi',
+                            foto_url: null
+                        });
+                    }
 
         // --- Ekspor CSV (Sudah Diperbaiki Bebas Typo) ---
         async function eksporCSV() {
