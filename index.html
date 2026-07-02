@@ -475,9 +475,57 @@
         }
 
         // --- Ekspor CSV ---
-        function eksporCSV() {
-            alert("Fitur ekspor CSV siap dikembangkan sesuai kebutuhan data.");
+       async function eksporCSV() {
+    try {
+        // 1. Tarik seluruh data absensi terbaru dari Supabase
+        let { data: semuaAbsen, error } = await supabaseClient
+            .from('absensi')
+            .select('*')
+            .order('tanggal', { ascending: false });
+
+        if (error) throw error;
+
+        if (!semanaAbsen || semuaAbsen.length === 0) {
+            alert("Tidak ada data absensi yang bisa diekspor.");
+            return;
         }
+
+        // 2. Buat susunan judul kolom (Header) di Excel/CSV
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Nama Karyawan,Tanggal,Jam Masuk,Jam Pulang,Status,Koordinat Lokasi,Link Foto Selfie\n";
+
+        // 3. Masukkan data karyawan baris demi baris
+        semuaAbsen.forEach(item => {
+            let nama = `"${item.nama || ''}"`;
+            let tanggal = `"${item.tanggal || ''}"`;
+            let jamMasuk = `"${item.jam_masuk || '-'}"`;
+            let jamPulang = `"${item.jam_pulang || '-'}"`;
+            let status = `"${item.status || ''}"`;
+            let lokasi = `"${item.lokasi || ''}"`;
+            let foto = `"${item.foto_url || '-'}"`;
+
+            // Gabungkan menjadi satu baris CSV dipisahkan oleh tanda koma
+            csvContent += `${nama},${tanggal},${jamMasuk},${jamPulang},${status},${lokasi},${foto}\n`;
+        });
+
+        // 4. Proses unduh otomatis di browser Admin
+        const encodedUri = encodeURI(csvContent);
+        const linkDownload = document.createElement("a");
+        
+        // Penamaan file otomatis berdasarkan tanggal hari ini
+        const tglHariIni = new Date().toISOString().split('T')[0];
+        linkDownload.setAttribute("href", encodedUri);
+        linkDownload.setAttribute("download", `Rekapan_Absensi_Dapen_${tglHariIni}.csv`);
+        
+        document.body.appendChild(linkDownload);
+        linkDownload.click(); // Jalankan klik unduh otomatis
+        document.body.removeChild(linkDownload); // Bersihkan sisa elemen
+
+    } catch (err) {
+        console.error(err);
+        alert("Gagal menarik data CSV: " + err.message);
+    }
+}
     </script>
 </body>
 </html>
