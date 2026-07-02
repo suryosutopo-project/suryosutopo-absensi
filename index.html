@@ -10,11 +10,10 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased">
 
-    <!-- HALAMAN LOGIN (MENGGUNAKAN NIP) -->
     <div id="page-login" class="flex min-h-screen items-center justify-center px-4">
         <div class="w-full max-w-sm space-y-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div class="text-center space-y-2">
-                <div class="flex items-center justify-center">                    
+                <div class="flex items-center justify-center">    
                     <img src="https://cdn.phototourl.com/free/2026-06-29-57f23145-8d9c-4194-b236-ed08bb96ab70.png" alt="Logo Perusahaan" class="h-10 w-auto object-contain">
                 </div>              
                 <h1 class="text-2xl font-bold text-slate-900">Selamat Datang</h1>
@@ -36,7 +35,6 @@
         </div>
     </div>
 
-    <!-- KONTEN APLIKASI UTAMA -->
     <div id="app-content" class="hidden">
         <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
             <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -58,7 +56,6 @@
 
         <main class="max-w-4xl mx-auto px-4 py-6">
             
-            <!-- 1. HALAMAN ABSENSI KARYAWAN -->
             <section id="page-karyawan" class="space-y-6">
                 <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center space-y-2">
                     <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold" id="user-avatar">..</div>
@@ -106,7 +103,6 @@
                 </div>
             </section>
 
-            <!-- 2. HALAMAN PENGAJUAN CUTI (KARYAWAN) -->
             <section id="page-cuti-karyawan" class="hidden space-y-6">
                 <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-1"><i data-lucide="calendar-plus" class="w-5 h-5 text-indigo-600"></i> Form Pengajuan Cuti</h2>
@@ -159,7 +155,6 @@
                 </div>
             </section>
 
-            <!-- 3. HALAMAN RIWAYAT ABSENSI (ADMIN) -->
             <section id="page-admin" class="hidden space-y-6">
                 <div class="flex items-center justify-between">
                     <h2 class="text-xl font-bold tracking-tight text-slate-900">Riwayat Absensi Seluruh Karyawan</h2>
@@ -186,7 +181,6 @@
                 </div>
             </section>
 
-            <!-- 4. HALAMAN PERSETUJUAN CUTI (ADMIN) -->
             <section id="page-cuti-admin" class="hidden space-y-6">
                 <h2 class="text-xl font-bold tracking-tight text-slate-900">Panel Persetujuan Cuti Karyawan</h2>
                 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -497,7 +491,7 @@
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
             semuaAbsen?.forEach(item => {
-                const badgeClass = item.status === 'Tepat Waktu' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700';
+                const badgeClass = item.status === 'Tepat Waktu' ? 'bg-emerald-50 text-emerald-700' : item.status === 'Cuti' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700';
                 const kolomFoto = item.foto_url ? `<a href="${item.foto_url}" target="_blank" class="text-indigo-600 hover:underline flex items-center gap-0.5"><i data-lucide="image" class="w-3.5 h-3.5"></i>Lihat</a>` : `-`;
                 tbody.innerHTML += `
                     <tr>
@@ -541,73 +535,65 @@
             });
         }
 
+        // FUNGSI PERSETUJUAN CUTI + OTOMATIS MASUK TABEL ABSENSI
         async function prosesPersetujuanCuti(idCuti, statusBaru) {
-    try {
-        // 1. Update status di tabel pengajuan_cuti terlebih dahulu
-        const { error: errorUpdate } = await supabaseClient
-            .from('pengajuan_cuti')
-            .update({ status: statusBaru })
-            .eq('id', idCuti);
-
-        if (errorUpdate) throw errorUpdate;
-
-        // 2. Jika disetujui (Approved), suntik otomatis ke tabel absensi harian
-        if (statusBaru === 'Approved') {
-            // Tarik data detail cuti yang baru saja disetujui
-            let { data: detailCuti } = await supabaseClient
-                .from('pengajuan_cuti')
-                .select('*')
-                .eq('id', idCuti)
-                .single();
-
-            if (detailCuti) {
-                let tanggalMulai = new Date(detailCuti.tanggal_mulai);
-                let tanggalSelesai = new Date(detailCuti.tanggal_selesai);
-
-                // Looping untuk memasukkan data "Cuti" per hari ke tabel absensi
-                let tglJalan = new Date(tanggalMulai);
-                while (tglJalan <= tanggalSelesai) {
-                    const formatTglCuti = tglJalan.toISOString().split('T')[0];
-
-                    // Cek apakah data absen di tanggal itu sudah ada (biar tidak duplikat)
-                    let { data: cekAbsen } = await supabaseClient
-                        .from('absensi')
-                        .select('id')
-                        .eq('user_id', detailCuti.user_id)
-                        .eq('tanggal', formatTglCuti)
-                        .maybeSingle();
-
-                    if (!cekAbsen) {
-                        // Masukkan ke tabel absensi dengan keterangan STATUS = Cuti
-                        await supabaseClient.from('absensi').insert({
-                            user_id: detailCuti.user_id,
-                            nama: detailCuti.nama,
-                            tanggal: formatTglCuti,
-                            jam_masuk: 'CUTI',
-                            jam_pulang: 'CUTI',
-                            status: 'Cuti',
-                            lokasi: 'Izin Cuti Resmi',
-                            foto_url: null
-                        });
-                    }
-
-        // --- Ekspor CSV (Sudah Diperbaiki Bebas Typo) ---
-        async function eksporCSV() {
             try {
-                let { data: semuaAbsen, error } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
-                if (error) throw error;
-                if (!semuaAbsen || semuaAbsen.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
+                const { error: errorUpdate } = await supabaseClient
+                    .from('pengajuan_cuti')
+                    .update({ status: statusBaru })
+                    .eq('id', idCuti);
 
-                let csvContent = "data:text/csv;charset=utf-8,Nama Karyawan,Tanggal,Jam Masuk,Jam Pulang,Status,Koordinat Lokasi,Link Foto Selfie\n";
-                semuaAbsen.forEach(item => {
-                    csvContent += `"${item.nama || ''}","${item.tanggal || ''}","${item.jam_masuk || '-'}","${item.jam_pulang || '-'}","${item.status || ''}","${item.lokasi || ''}","${item.foto_url || '-'}"\n`;
-                });
+                if (errorUpdate) throw errorUpdate;
 
-                const linkDownload = document.createElement("a");
-                linkDownload.setAttribute("href", encodeURI(csvContent));
-                linkDownload.setAttribute("download", `Rekapan_Absensi_Dapen_${new Date().toISOString().split('T')[0]}.csv`);
-                document.body.appendChild(linkDownload); linkDownload.click(); document.body.removeChild(linkDownload);
-            } catch (err) { alert("Gagal menarik CSV: " + err.message); }
+                if (statusBaru === 'Approved') {
+                    let { data: detailCuti } = await supabaseClient
+                        .from('pengajuan_cuti')
+                        .select('*')
+                        .eq('id', idCuti)
+                        .single();
+
+                    if (detailCuti) {
+                        let tanggalMulai = new Date(detailCuti.tanggal_mulai);
+                        let tanggalSelesai = new Date(detailCuti.tanggal_selesai);
+
+                        let tglJalan = new Date(tanggalMulai);
+                        while (tglJalan <= tanggalSelesai) {
+                            const formatTglCuti = tglJalan.toISOString().split('T')[0];
+
+                            let { data: cekAbsen } = await supabaseClient
+                                .from('absensi')
+                                .select('id')
+                                .eq('user_id', detailCuti.user_id)
+                                .eq('tanggal', formatTglCuti)
+                                .maybeSingle();
+
+                            if (!cekAbsen) {
+                                await supabaseClient.from('absensi').insert({
+                                    user_id: detailCuti.user_id,
+                                    nama: detailCuti.nama,
+                                    tanggal: formatTglCuti,
+                                    jam_masuk: 'CUTI',
+                                    jam_pulang: 'CUTI',
+                                    status: 'Cuti',
+                                    lokasi: 'Izin Cuti Resmi',
+                                    foto_url: null
+                                });
+                            }
+                            tglJalan.setDate(tglJalan.getDate() + 1);
+                        }
+                    }
+                }
+
+                alert(`Pengajuan berhasil di-${statusBaru === 'Approved' ? 'SETUJUI dan dicatat di Absensi' : 'TOLAK'}!`);
+                muatPengajuanCutiAdmin();
+
+            } catch (err) {
+                alert("Gagal memproses persetujuan: " + err.message);
+            }
+        }
+
+        function eksporCSV() {
+            alert("Fitur Ekspor CSV siap dikembangkan.");
         }
     </script>
 </body>
