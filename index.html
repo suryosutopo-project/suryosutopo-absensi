@@ -386,58 +386,93 @@
 
         // --- Logika Absensi ---
         function prosesAbsen(jenis) {
-            const sekarang = new Date();
-            const formatTanggal = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0]; 
-            const formatJam = `${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`;
+    const sekarang = new Date();
+    const formatTanggal = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0]; 
+    const formatJam = `${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`;
 
-            dapatkanLokasi(async (koordinat) => {
-                const fotoBlob = await tangkapGambarDariKamera();
-                if (!fotoBlob) { alert("Gagal mengambil foto."); return; }
-
-                document.getElementById('location-status').innerText = "Mengupload foto selfie...";
-
-                let { data: dataHariIni } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', formatTanggal).maybeSingle();
-
-                const namaFile = `${userAktif.id}_${formatTanggal}_${jenis.toLowerCase()}.jpg`;
-                const { error: errorUpload } = await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { cacheControl: '3600', upsert: true });
-                if (errorUpload) { alert("Gagal upload foto: " + errorUpload.message); return; }
-
-                const { data: urlData } = supabaseClient.storage.from('foto-absen').getPublicUrl(namaFile);
-                const publicFotoUrl = urlData.publicUrl;
-
-                if (jenis === 'Masuk') {
-                    if (dataHariIni && dataHariIni.jam_masuk) { alert("Anda sudah absen masuk!"); return; }
-                    let status = (sekarang.getHours() > BATAS_JAM_MASUK || (sekarang.getHours() === BATAS_JAM_MASUK && sekarang.getMinutes() > BATAS_MENIT_MASUK)) ? 'Terlambat' : 'Tepat Waktu';
-
-                    await supabaseClient.from('absensi').insert({
-                        user_id: userAktif.id,
-                        nama: userAktif.user_metadata.full_name || userAktif.email.split('@')[0],
-                        tanggal: formatTanggal,
-                        jam_masuk: formatJam,
-                        status: status,
-                        lokasi: koordinat,
-                        foto_url: publicFotoUrl
-                    });
-                    alert(`Absen Masuk Sukses pukul ${formatJam}`);
-                } else {
-                    if (!dataHariIni) { alert("Belum absen masuk!"); return; }
-                    if (dataHariIni.jam_pulang) { alert("Anda sudah absen pulang!"); return; }
-
-                    await supabaseClient.from('absensi').update({ jam_pulang: formatJam, foto_url: publicFotoUrl }).eq('id', dataHariIni.id);
-                    alert(`Absen Pulang Sukses pukul ${formatJam}`);
-                }
-                muatStatusHariIni();
-            });
+    // Validasi ganda ke database sebelum GPS menyala
+    supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', formatTanggal).maybeSingle()
+    .then(({ data: dataHariIni }) => {
+        
+        // JIKA STATUS SUDAH CUTI, BLOKIR PROSES
+        if (dataHariIni && dataHariIni.status === 'Cuti') {
+            alert("Gagal! Anda sedang dalam masa cuti resmi hari ini.");
+            return;
         }
 
-        async function muatStatusHariIni() {
-            if (!userAktif) return;
-            const sekarang = new Date();
-            const tglHariIni = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0];
-            let { data } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', tglHariIni).maybeSingle();
-            document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
-            document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
-        }
+        // Jika lolos validasi cuti, jalankan proses absen normal seperti biasa
+        dapatkanLokasi(async (koordinat) => {
+            const fotoBlob = await tangkapGambarDariKamera();
+            if (!fotoBlob) { alert("Gagal mengambil foto."); return; }
+
+            document.getElementById('location-status').innerText = "Mengupload foto selfie...";
+
+            const namaFile = `${userAktif.id}_${formatTanggal}_${jenis.toLowerCase()}.jpg`;
+            const { error: errorUpload } = await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { cacheControl: '3600', upsert: true });
+            if (errorUpload) { alert("Gagal upload foto: " + errorUpload.message); return; }
+
+            const { data: urlData } = supabaseClient.storage.from('foto-absen').getPublicUrl(namaFile);
+            const publicFotoUrl = urlData.publicUrl;
+
+            if (jenis === 'Masuk') {
+                if (dataHariIni && dataHariIni.jam_masuk) { alert("Anda sudah absen masuk!"); return; }
+                let status = (sekarang.getHours() > BATAS_JAM_MASUK || (sekarang.getHours() === BATAS_JAM_MASUK && sekarang.getMinutes() > BATAS_MENIT_MAX)) ? 'Terlambat' : 'Tepat Waktu';
+
+                await supabaseClient.from('absensi').insert({
+                    user_id: userAktif.id,
+                    nama: userAktif.user_metadata.full_name || userAktif.email.split('@')[0],
+                    tanggal: formatTanggal,
+                    jam_masuk: formatJam,
+                    status: status,
+                    lokasi: koordinat,
+                    foto_url: publicFotoUrl
+                });
+                alert(`Absen Masuk Sukses pukul ${formatJam}`);
+            } else {
+                if (!dataHariIni) { alert("Belum absen masuk!"); return; }
+                if (dataHariIni.jam_pulang) { alert("Anda sudah absen pulang!"); return; }
+
+                await supabaseClient.from('absensi').update({ jam_pulang: formatJam, foto_url: publicFotoUrl }).eq('id', dataHariIni.id);
+                alert(`Absen Pulang Sukses pukul ${formatJam}`);
+            }
+            muatStatusHariIni();
+        });
+    });
+}
+
+       async function muatStatusHariIni() {
+    if (!userAktif) return;
+    const sekarang = new Date();
+    const tglHariIni = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0];
+    
+    let { data } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', tglHariIni).maybeSingle();
+    
+    // Update teks jam masuk dan pulang di kotak status
+    document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
+    document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
+
+    // --- LOGIKA KUNCI AKSES JIKA SEDANG CUTI ---
+    if (data?.status === 'Cuti') {
+        // Matikan kamera agar hemat baterai/kuota
+        matikanKamera();
+        
+        // Ganti area status lokasi menjadi pemberitahuan cuti resmi
+        document.getElementById('location-status').innerHTML = `
+            <div class="mt-2 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl font-medium text-sm flex items-center justify-center gap-2 w-full">
+                <span>📅 Hari ini Anda terdaftar sedang melaksanakan Cuti Resmi.</span>
+            </div>
+        `;
+        
+        // Cari area tombol absen masuk & pulang, lalu sembunyikan atau nonaktifkan
+        const tombolAbsen = document.querySelectorAll('#page-karyawan button[onclick^="prosesAbsen"]');
+        tombolAbsen.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.4';
+            btn.style.cursor = 'not-allowed';
+            btn.setAttribute('onclick', 'alert("Anda tidak dapat absen karena sedang dalam masa cuti resmi.")');
+        });
+    }
+}
 
         // --- Logika Fitur Cuti Karyawan ---
         async function ajukanCuti(e) {
