@@ -321,10 +321,11 @@ function switchPage(page) {
         document.getElementById('page-cuti-karyawan').classList.remove('hidden');
         document.getElementById('nav-cuti-karyawan').classList.add('bg-indigo-50', 'text-indigo-600');
         matikanKamera(); muatRiwayatCutiKaryawan();
-    } else if (page === 'admin') {
+   } else if (page === 'admin') {
         document.getElementById('page-admin').classList.remove('hidden');
         document.getElementById('nav-admin').classList.add('bg-indigo-50', 'text-indigo-600');
-        matikanKamera(); // Tambahkan logika render admin Anda di sini jika ada
+        matikanKamera(); 
+        muatRiwayatAbsenAdmin(); // <-- PASTIKAN BARIS INI ADA UNTUK MEMANGGIL DATA
     } else if (page === 'cuti-admin') {
         document.getElementById('page-cuti-admin').classList.remove('hidden');
         document.getElementById('nav-cuti-admin').classList.add('bg-indigo-50', 'text-indigo-600');
@@ -411,7 +412,87 @@ async function muatStatusHariIni() {
     if(document.getElementById('today-masuk')) document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
     if(document.getElementById('today-pulang')) document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
 }
+// --- MANAJEMEN ADMIN: MUAT RIWAYAT ABSENSI ---
+async function muatRiwayatAbsenAdmin() {
+    const tbody = document.getElementById('table-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Memuat data absensi...</td></tr>';
 
+    // Ambil seluruh data absensi dari Supabase, urutkan dari tanggal terbaru
+    let { data: listAbsen, error } = await supabaseClient
+        .from('absensi')
+        .select('*')
+        .order('tanggal', { ascending: false })
+        .order('jam_masuk', { ascending: false });
+
+    if (error) {
+        console.error("Gagal mengambil data absensi:", error);
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Gagal memuat data: ${error.message}</td></tr>`;
+        return;
+    }
+
+    if (!listAbsen || listAbsen.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada data absensi masuk.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = ''; // Bersihkan loader
+    
+    listAbsen.forEach(absen => {
+        // Tentukan warna badge status
+        let statusColor = 'bg-slate-100 text-slate-700';
+        if (absen.status === 'Tepat Waktu') statusColor = 'bg-emerald-50 text-emerald-700 font-semibold';
+        if (absen.status === 'Terlambat') statusColor = 'bg-amber-50 text-amber-700 font-semibold';
+        if (absen.status === 'Cuti') statusColor = 'bg-indigo-50 text-indigo-700 font-semibold';
+
+        // Cek jika foto_url tersedia
+        let komponenFoto = '<span class="text-xs text-slate-400 italic">Tidak ada foto</span>';
+        if (absen.foto_url) {
+            komponenFoto = `
+                <a href="${absen.foto_url}" target="_blank" class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline font-medium">
+                    <i data-lucide="image" class="w-3.5 h-3.5"></i> Lihat Foto
+                </a>
+            `;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50/80 transition";
+        tr.innerHTML = `
+            <td class="p-4 font-medium text-slate-900">${absen.nama || '-'}</td>
+            <td class="p-4 text-slate-600 font-mono text-xs">${absen.tanggal}</td>
+            <td class="p-4 text-emerald-600 font-semibold">${absen.jam_masuk || '-'}</td>
+            <td class="p-4 text-rose-600 font-semibold">${absen.jam_pulang || '-'}</td>
+            <td class="p-4">${komponenFoto}</td>
+            <td class="p-4">
+                <span class="px-2 py-0.5 rounded-full text-xs ${statusColor}">${absen.status || 'Masuk'}</span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Refresh ikon Lucide agar ikon gambar muncul di tabel
+    lucide.createIcons();
+}
+
+// --- FUNGSI EKSPOR CSV UNTUK ADMIN ---
+async function eksporCSV() {
+    let { data: listAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
+    if (!listAbsen || listAbsen.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
+
+    let csvContent = "data:text/csv;charset=utf-8,Nama,Tanggal,Jam Masuk,Jam Pulang,Status,Lokasi\n";
+    listAbsen.forEach(r => {
+        csvContent += `"${r.nama}","${r.tanggal}","${r.jam_masuk || '-'}","${r.jam_pulang || '-'}","${r.status}","${r.lokasi || '-'}"\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Rekap_Absensi_Dapen_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 // --- MANAJEMEN CUTI KARYAWAN ---
 async function ajukanCuti(e) {
     e.preventDefault();
