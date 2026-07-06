@@ -656,7 +656,79 @@
         }
 
         function eksporCSV() { alert("Fitur ekspor CSV siap dikonfigurasi."); }
-        function cetakFormulirCuti(data) { alert("Membuka berkas cetak..."); }
+       function cetakFormulirCuti(dataTerenkripsi) {
+    try {
+        // Dekode data cuti dari baris tabel
+        const dataMentah = decodeURIComponent(escape(atob(dataTerenkripsi)));
+        const dataCuti = JSON.parse(dataMentah);
+
+        // Ambil elemen utama aplikasi untuk disembunyikan sementara
+        const appContent = document.getElementById('app-content');
+        if (!appContent) return;
+
+        // Buat elemen penampung cetak khusus
+        const areaCetak = document.createElement('div');
+        areaCetak.id = 'print-temporary-area';
+        areaCetak.className = 'bg-white p-6 font-sans text-slate-950 min-h-screen flex flex-col justify-center items-center';
+
+        // Desain template surat resmi di dalam layar aktif
+        areaCetak.innerHTML = `
+            <div class="w-full max-w-2xl border border-slate-300 p-8 rounded-lg shadow-sm bg-white">
+                <div class="text-center border-b-2 border-slate-900 pb-4 mb-6">
+                    <h1 class="text-xl font-bold uppercase tracking-wide text-indigo-900">Dana Pensiun Bank Jateng</h1>
+                    <p class="text-xs text-slate-500">Jl. Pemuda No. 142, Semarang, Jawa Tengah</p>
+                    <h2 class="text-md font-semibold mt-4 tracking-wider underline">SURAT IJIN CUTI KARYAWAN</h2>
+                    <p class="text-xs text-slate-400 mt-1">ID Pengajuan: ${dataCuti.id.substring(0,8).toUpperCase()}</p>
+                </div>
+
+                <div class="space-y-4 text-sm">
+                    <p class="mb-4">Menerangkan bahwa permohonan cuti karyawan berikut telah **DISETUJUI** oleh pihak manajemen:</p>
+                    
+                    <table class="w-full border-collapse text-left">
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600 w-1/3">Nama Karyawan</td><td class="py-2 text-slate-900">: ${dataCuti.nama}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">NIP Pegawai</td><td class="py-2 text-slate-900">: ${dataCuti.nip || '-'}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Jenis Cuti</td><td class="py-2 text-slate-900">: ${dataCuti.jenis_cuti}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Tanggal Durasi</td><td class="py-2 text-slate-900 font-mono">: ${dataCuti.tanggal_mulai} s/d ${dataCuti.tanggal_selesai}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Alasan</td><td class="py-2 text-slate-900">: ${dataCuti.alasan}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Status</td><td class="py-2 text-emerald-600 font-bold">: SAH & DISETUJUI</td></tr>
+                    </table>
+                </div>
+
+                <div class="mt-12 flex justify-between text-sm">
+                    <div class="text-center"><p class="text-xs text-slate-400 mb-14">Pemohon,</p><p class="font-semibold underline">${dataCuti.nama}</p></div>
+                    <div class="text-center"><p class="text-xs text-slate-400 mb-14">Semarang, Mengetahui,</p><p class="font-semibold underline">Manajemen Dapen</p></div>
+                </div>
+
+                <div class="mt-8 pt-4 border-t border-slate-200 text-center flex justify-center gap-2 style-print-hidden">
+                    <button id="btn-do-print" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl text-xs shadow-sm transition cursor-pointer">🖨️ Cetak / Save PDF</button>
+                    <button id="btn-close-print" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium px-4 py-2 rounded-xl text-xs transition cursor-pointer">Kembali ke Aplikasi</button>
+                </div>
+            </div>
+            <style>
+                @media print { .style-print-hidden { display: none !important; } body { background: white; } }
+            </style>
+        `;
+
+        // Sembunyikan aplikasi utama dan tampilkan area surat cuti
+        appContent.classList.add('hidden');
+        document.body.appendChild(areaCetak);
+
+        // Pasang fungsi tombol Cetak
+        document.getElementById('btn-do-print').onclick = function() {
+            window.print();
+        };
+
+        // Pasang fungsi tombol Kembali (Menghancurkan halaman surat dan memulihkan aplikasi)
+        document.getElementById('btn-close-print').onclick = function() {
+            areaCetak.remove();
+            appContent.classList.remove('hidden');
+        };
+
+    } catch (err) {
+        console.error(err);
+        alert("Gagal memproses formulir cetak.");
+    }
+}
     </script>
 </body>
 </html>
