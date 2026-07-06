@@ -474,7 +474,79 @@ async function muatRiwayatAbsenAdmin() {
     // Refresh ikon Lucide agar ikon gambar muncul di tabel
     lucide.createIcons();
 }
+// --- MANAJEMEN ADMIN: MUAT RIWAYAT PERSETUJUAN CUTI (SUDAH DIPERBAIKI) ---
+async function muatRiwayatCutiAdmin() {
+    const tbody = document.getElementById('table-cuti-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Memuat pengajuan cuti...</td></tr>';
 
+    // MENGGUNAKAN NAMA TABEL ASLI ANDA: pengajuan_cuti
+    let { data: listCuti, error } = await supabaseClient
+        .from('pengajuan_cuti') 
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error("Gagal mengambil data cuti:", error);
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500 font-medium">Gagal memuat: ${error.message}</td></tr>`;
+        return;
+    }
+
+    if (!listCuti || listCuti.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada riwayat pengajuan cuti.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = ''; // Bersihkan loader
+    
+    listCuti.forEach(item => {
+        let badgeStyle = 'bg-amber-50 text-amber-700 font-medium'; // Default: Pending
+        if (item.status === 'Disetujui') badgeStyle = 'bg-emerald-50 text-emerald-700 font-bold';
+        if (item.status === 'Ditolak') badgeStyle = 'bg-rose-50 text-rose-700 font-bold';
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50/80 transition border-b border-slate-100";
+        tr.innerHTML = `
+            <td class="p-4 font-medium text-slate-900">${item.nama || '-'}</td>
+            <td class="p-4 text-slate-600 text-sm">${item.jenis_cuti || 'Cuti Tahunan'}</td>
+            <td class="p-4 text-slate-600 text-xs font-mono">${item.tanggal_mulai} s/d ${item.tanggal_selesai}</td>
+            <td class="p-4 text-slate-500 text-sm max-w-xs truncate" title="${item.alasan}">${item.alasan || '-'}</td>
+            <td class="p-4">
+                <span class="px-2.5 py-1 rounded-full text-xs ${badgeStyle}">
+                    ${item.status || 'Menunggu'}
+                </span>
+            </td>
+            <td class="p-4">
+                ${item.status === 'Pending' || !item.status || item.status === 'Menunggu' ? `
+                    <div class="flex gap-2">
+                        <button onclick="prosesAksiCuti('${item.id}', 'Disetujui')" class="px-2 py-1 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700 transition">Setujui</button>
+                        <button onclick="prosesAksiCuti('${item.id}', 'Ditolak')" class="px-2 py-1 bg-rose-600 text-white rounded text-xs hover:bg-rose-700 transition">Tolak</button>
+                    </div>
+                ` : `<span class="text-xs text-slate-400 italic">Selesai diproses</span>`}
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// --- FUNGSI PROSES PERSETUJUAN (SUDAH DIPERBAIKI) ---
+async function prosesAksiCuti(idCuti, statusBaru) {
+    if (!confirm(`Apakah Anda yakin ingin mengubah status menjadi ${statusBaru}?`)) return;
+
+    // MENGGUNAKAN NAMA TABEL ASLI ANDA: pengajuan_cuti
+    const { error } = await supabaseClient
+        .from('pengajuan_cuti')
+        .update({ status: statusBaru })
+        .eq('id', idCuti);
+
+    if (error) {
+        alert("Gagal memproses aksi: " + error.message);
+    } else {
+        alert(`Pengajuan cuti berhasil di-${statusBaru.toLowerCase()}!`);
+        muatRiwayatCutiAdmin(); // Refresh tabel
+    }
+}
 // --- FUNGSI EKSPOR CSV UNTUK ADMIN ---
 async function eksporCSV() {
     let { data: listAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
