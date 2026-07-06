@@ -567,7 +567,7 @@ async function muatRiwayatCutiKaryawan() {
     lucide.createIcons();
 }
 
-// --- FUNGSI GENERATOR SURAT CUTI FORMAL & PROSES PRINT ---
+// --- FUNGSI GENERATOR SURAT CUTI FORMAL & PROSES PRINT (PERBAIKAN FILE KOSONG) ---
 async function aksiCetakFormulir(idCuti) {
     const { data, error } = await supabaseClient.from('pengajuan_cuti').select('*').eq('id', idCuti).single();
     if (error || !data) { alert("Data gagal diambil untuk dicetak!"); return; }
@@ -611,8 +611,14 @@ async function aksiCetakFormulir(idCuti) {
         </div>
     `;
     
-    // Perintah cetak dokumen sistem
+    // Munculkan area cetak agar dibaca oleh printer sistem
+    printArea.classList.remove('hidden');
+    
+    // Jalankan perintah cetak browser
     window.print();
+    
+    // Sembunyikan kembali setelah dialog cetak ditutup
+    printArea.classList.add('hidden');
 }
     </script>
 </body>
