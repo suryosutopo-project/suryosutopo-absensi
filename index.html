@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>dapenbankjateng - Aplikasi Absensi & Cuti Karyawan</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -12,7 +12,7 @@
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
         }
     </style>
 </head>
@@ -213,7 +213,6 @@
         </main>
     </div>
 
-    <!-- WADAH STRUKTUR FORMULIR SURAT CUTI RESMI SAAT DICETAK -->
     <div id="print-area" class="hidden p-10 bg-white text-black font-serif leading-relaxed"></div>
 
     <script>
@@ -542,7 +541,6 @@ async function muatRiwayatCutiKaryawan() {
         let badgeStyle = 'bg-amber-50 text-amber-700';
         let tombolCetak = '<span class="text-slate-400 text-xs italic">-</span>';
 
-        // Jika disetujui, tampilkan tombol cetak resmi
         if (item.status === 'Disetujui' || item.status === 'Approved') {
             badgeStyle = 'bg-emerald-50 text-emerald-700 font-bold';
             tombolCetak = `
@@ -567,7 +565,7 @@ async function muatRiwayatCutiKaryawan() {
     lucide.createIcons();
 }
 
-// --- FUNGSI GENERATOR SURAT CUTI FORMAL & PROSES PRINT (PERBAIKAN FILE KOSONG) ---
+// --- FUNGSI GENERATOR SURAT CUTI FORMAL & PROSES PRINT (FIX FILE KOSONG) ---
 async function aksiCetakFormulir(idCuti) {
     const { data, error } = await supabaseClient.from('pengajuan_cuti').select('*').eq('id', idCuti).single();
     if (error || !data) { alert("Data gagal diambil untuk dicetak!"); return; }
@@ -611,13 +609,13 @@ async function aksiCetakFormulir(idCuti) {
         </div>
     `;
     
-    // Munculkan area cetak agar dibaca oleh printer sistem
+    // Tampilkan elemen agar terbaca browser saat proses print dimulai
     printArea.classList.remove('hidden');
     
-    // Jalankan perintah cetak browser
+    // Jalankan cetak bawaan browser
     window.print();
     
-    // Sembunyikan kembali setelah dialog cetak ditutup
+    // Sembunyikan kembali agar tidak merusak UI halaman
     printArea.classList.add('hidden');
 }
     </script>
