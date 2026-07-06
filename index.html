@@ -408,7 +408,11 @@
             document.getElementById('location-status').innerText = "Mengupload foto selfie...";
 
             const namaFile = `${userAktif.id}_${formatTanggal}_${jenis.toLowerCase()}.jpg`;
-            const { error: errorUpload } = await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { cacheControl: '3600', upsert: true });
+            const { error: errorUpload } = await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { 
+    cacheControl: '3600', 
+    upsert: true,
+    duplication: 'overwrite' // Perintah paksa untuk menimpa jika file sudah ada
+});
             if (errorUpload) { alert("Gagal upload foto: " + errorUpload.message); return; }
 
             const { data: urlData } = supabaseClient.storage.from('foto-absen').getPublicUrl(namaFile);
