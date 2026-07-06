@@ -476,17 +476,25 @@ function eksekusiTampilanCetak(dataCuti) {
         const idMentah = dataCuti.id ? String(dataCuti.id) : '0';
         const idPotong = idMentah.length > 8 ? idMentah.substring(0, 8).toUpperCase() : idMentah;
 
+        // SILAKAN GANTI URL DI BAWAH INI DENGAN PUBLIC URL LOGO ANDA JIKA SUDAH DI-UPLOAD
+        const urlLogoResmi = "LogoDapen-1.png"; 
+
         areaCetak.innerHTML = `
             <div class="w-full max-w-2xl border border-slate-300 p-8 rounded-lg shadow-sm bg-white">
-                <div class="text-center border-b-2 border-slate-900 pb-4 mb-6">
-                    <h1 class="text-xl font-bold uppercase text-indigo-900">Dana Pensiun Bank Jateng</h1>
-                    <p class="text-xs text-slate-500">Jl. Ki Mangunsarkoro No.25 , Semarang</p>
-                    <h2 class="text-md font-semibold mt-4 underline tracking-wide">SURAT IZIN CUTI KARYAWAN</h2>
-                    <p class="text-[10px] text-slate-400 mt-1">ID Pengajuan: #${idPotong}</p>
+                
+                <div class="flex items-center gap-4 border-b-2 border-slate-900 pb-4 mb-6">
+                    <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                        <img src="${https://cdn.phototourl.com/free/2026-06-29-57f23145-8d9c-4194-b236-ed08bb96ab70.png}" alt="Logo Dapen Bank Jateng" class="max-w-full max-h-full object-contain" onerror="this.style.display='none';">
+                    </div>
+                    <div class="flex-1 text-center pr-12"> <h1 class="text-xl font-bold uppercase text-indigo-900 tracking-wide">Dana Pensiun Bank Jateng</h1>
+                        <p class="text-xs text-slate-500 font-medium">Jl. Pemuda No. 142, Semarang, Jawa Tengah</p>
+                        <h2 class="text-md font-semibold mt-3 underline tracking-wider">SURAT IZIN CUTI KARYAWAN</h2>
+                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">ID Pengajuan: #${idPotong}</p>
+                    </div>
                 </div>
 
                 <div class="space-y-4 text-sm">
-                    <p>Menerangkan bahwa permohonan cuti karyawan berikut telah <strong class="text-emerald-600">DISETUJUI</strong>:</p>
+                    <p>Menerangkan bahwa permohonan cuti karyawan berikut telah <strong class="text-emerald-600">DISETUJUI</strong> oleh manajemen:</p>
                     <table class="w-full text-left border-collapse">
                         <tr class="border-b border-slate-100"><td class="py-2.5 w-1/3 font-semibold text-slate-600">Nama Karyawan</td><td>: ${dataCuti.nama}</td></tr>
                         <tr class="border-b border-slate-100"><td class="py-2.5 font-semibold text-slate-600">NIP Pegawai</td><td>: ${dataCuti.nip || '-'}</td></tr>
@@ -508,14 +516,14 @@ function eksekusiTampilanCetak(dataCuti) {
 
                     <div class="flex flex-col justify-between h-32 items-center">
                         <p class="font-medium text-slate-500">Sistem Verifikasi,</p>
-                        <div class="border-2 border-dashed border-emerald-500 bg-emerald-50/50 rounded-lg p-2 my-auto transform -rotate-2 max-w-[140px]">
+                        <div class="border border-dashed border-emerald-500 bg-emerald-50/50 rounded-lg p-2 my-auto transform -rotate-1 max-w-[140px]">
                             <p class="text-[9px] font-bold uppercase text-emerald-700 tracking-wider">Approved by System</p>
                             <p class="text-[7px] text-emerald-600 font-mono mt-0.5">E-ABSENSI DAPEN</p>
                             <p class="text-[6px] text-slate-400 font-mono">ID-${idPotong}</p>
                         </div>
                         <div>
-                            <p class="font-bold text-emerald-600">DIGITAL SIGNED</p>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Otomatis Terbuku</p>
+                            <p class="font-bold text-emerald-600 text-[10px]">DIGITAL VERIFIED</p>
+                            <p class="text-[9px] text-slate-400">Otomatis Terbuku</p>
                         </div>
                     </div>
 
@@ -530,8 +538,8 @@ function eksekusiTampilanCetak(dataCuti) {
                 </div>
 
                 <div class="mt-12 pt-4 border-t border-slate-200 text-center flex justify-center gap-2 style-print-hidden">
-                    <button id="real-print-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">🖨️ Cetak / Save PDF</button>
-                    <button id="real-close-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">Kembali</button>
+                    <button id="real-print-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-medium cursor-pointer shadow-sm">🖨️ Cetak / Simpan PDF</button>
+                    <button id="real-close-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">Kembali ke Aplikasi</button>
                 </div>
             </div>
             <style>
@@ -553,7 +561,7 @@ function eksekusiTampilanCetak(dataCuti) {
         };
     } catch (e) { 
         console.error(e);
-        alert("Gagal memuatan lembar cetak."); 
+        alert("Gagal memuat lembar cetak."); 
     }
 }
 
