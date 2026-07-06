@@ -465,7 +465,7 @@ async function muatRiwayatCutiKaryawan() {
     });
 }
 
-// --- FUNGSI HALAMAN CETAK ANTI BLOKIR ---
+// --- FUNGSI HALAMAN CETAK ANTI BLOKIR (FIXED ERROR SUBSTRING) ---
 function eksekusiTampilanCetak(dataCuti) {
     try {
         const appContent = document.getElementById('app-content');
@@ -473,12 +473,17 @@ function eksekusiTampilanCetak(dataCuti) {
         areaCetak.id = 'print-temporary-area';
         areaCetak.className = 'bg-white p-6 text-slate-950 min-h-screen flex flex-col justify-center items-center absolute top-0 left-0 w-full z-[9999]';
 
+        // Konversi ID ke String terlebih dahulu sebelum melakukan substring agar tidak error
+        const idMentah = dataCuti.id ? String(dataCuti.id) : '0';
+        const idPotong = idMentah.length > 8 ? idMentah.substring(0, 8).toUpperCase() : idMentah;
+
         areaCetak.innerHTML = `
             <div class="w-full max-w-2xl border border-slate-300 p-8 rounded-lg shadow-sm bg-white">
                 <div class="text-center border-b-2 border-slate-900 pb-4 mb-6">
                     <h1 class="text-xl font-bold uppercase text-indigo-900">Dana Pensiun Bank Jateng</h1>
                     <p class="text-xs text-slate-500">Jl. Pemuda No. 142, Semarang</p>
                     <h2 class="text-md font-semibold mt-4 underline">SURAT IJIN CUTI KARYAWAN</h2>
+                    <p class="text-[10px] text-slate-400 mt-1">ID Pengajuan: #${idPotong}</p>
                 </div>
                 <div class="space-y-4 text-sm">
                     <p>Menerangkan bahwa permohonan cuti karyawan telah <strong class="text-emerald-600">DISETUJUI</strong>:</p>
@@ -491,11 +496,11 @@ function eksekusiTampilanCetak(dataCuti) {
                     </table>
                 </div>
                 <div class="mt-8 pt-4 border-t text-center flex justify-center gap-2 style-print-hidden">
-                    <button id="real-print-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-medium">🖨️ Cetak / Save PDF</button>
-                    <button id="real-close-btn" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-xs font-medium">Kembali</button>
+                    <button id="real-print-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">🖨️ Cetak / Save PDF</button>
+                    <button id="real-close-btn" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">Kembali</button>
                 </div>
             </div>
-            <style>@media print { .style-print-hidden { display: none !important; } }</style>
+            <style>@media print { .style-print-hidden { display: none !important; } body { background: white; } }</style>
         `;
 
         appContent.classList.add('hidden');
@@ -506,7 +511,10 @@ function eksekusiTampilanCetak(dataCuti) {
             areaCetak.remove();
             appContent.classList.remove('hidden');
         };
-    } catch (e) { alert("Gagal memuat halaman cetak."); }
+    } catch (e) { 
+        console.error(e);
+        alert("Gagal memuat halaman cetak."); 
+    }
 }
 
 // --- PANEL ADMIN (ABSEN & CUTI) ---
