@@ -211,321 +211,232 @@
     </div>
 
     <script>
-        // --- KONFIGURASI SUPABASE ---
-        const SUPABASE_URL = "https://czrfgfsktsnvdwmjpzbx.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6cmZnZnNrdHNudmR3bWpwemJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NzkyNTEsImV4cCI6MjA5ODI1NTI1MX0.8xF64JQQZHst1iY-PdO8qWEaeCpF5S5W3cqvU8tyzZY";
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      // --- KONFIGURASI SUPABASE ---
+const SUPABASE_URL = "https://czrfgfsktsnvdwmjpzbx.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6cmZnZnNrdHNudmR3bWpwemJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NzkyNTEsImV4cCI6MjA5ODI1NTI1MX0.8xF64JQQZHst1iY-PdO8qWEaeCpF5S5W3cqvU8tyzZY";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // --- KONFIGURASI KANTOR (GEOFENCING) ---
-        const KANTOR_LAT = -6.99227672717298;  
-        const KANTOR_LON = 110.4288534847692; 
-        const RADIUS_MAKSIMAL_METER = 750; 
-        const BATAS_JAM_MASUK = 7; 
-        const BATAS_MENIT_MASUK = 30; 
+// --- KONFIGURASI KANTOR (GEOFENCING) ---
+const KANTOR_LAT = -6.99227672717298;  
+const KANTOR_LON = 110.4288534847692; 
+const RADIUS_MAKSIMAL_METER = 750; 
+const BATAS_JAM_MASUK = 7; 
+const BATAS_MENIT_MASUK = 30; 
 
-        let userAktif = null;
-        let streamKamera = null;
+let userAktif = null;
+let streamKamera = null;
 
-        // --- Proteksi Login & Sesi ---
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (session) {
-                userAktif = session.user;
-                document.getElementById('page-login').classList.add('hidden');
-                document.getElementById('app-content').classList.remove('hidden');
-                
-                const namaUser = userAktif.user_metadata.full_name || userAktif.email.split('@')[0];
-                document.getElementById('employee-name').innerText = namaUser;
-                document.getElementById('user-avatar').innerText = namaUser.substring(0,2).toUpperCase();
+// --- Sesi & Hak Akses ---
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session) {
+        userAktif = session.user;
+        document.getElementById('page-login').classList.add('hidden');
+        document.getElementById('app-content').classList.remove('hidden');
+        
+        const namaUser = userAktif.user_metadata.full_name || userAktif.email.split('@')[0];
+        document.getElementById('employee-name').innerText = namaUser;
+        document.getElementById('user-avatar').innerText = namaUser.substring(0,2).toUpperCase();
 
-                // Deteksi Hak Akses Khusus Akun Admin Pak Teddy
-                if (userAktif.email === '0013@dapen.com') {
-                    document.getElementById('nav-admin').classList.remove('hidden');
-                    document.getElementById('nav-cuti-admin').classList.remove('hidden');
-                } else {
-                    document.getElementById('nav-admin').classList.add('hidden');
-                    document.getElementById('nav-cuti-admin').classList.add('hidden');
-                }
+        if (userAktif.email === '0013@dapen.com') {
+            document.getElementById('nav-admin').classList.remove('hidden');
+            document.getElementById('nav-cuti-admin').classList.remove('hidden');
+        } else {
+            document.getElementById('nav-admin').classList.add('hidden');
+            document.getElementById('nav-cuti-admin').classList.add('hidden');
+        }
 
-                // Jalankan fungsi setelah DOM dipastikan siap
-                setTimeout(() => {
-                    muatStatusHariIni();
-                    aktifkanKamera();
-                }, 100);
+        setTimeout(() => {
+            muatStatusHariIni();
+            aktifkanKamera();
+        }, 100);
 
-                lucide.createIcons();
-            } else {
-                matikanKamera();
-                document.getElementById('page-login').classList.remove('hidden');
-                document.getElementById('app-content').classList.add('hidden');
-            }
+        lucide.createIcons();
+    } else {
+        matikanKamera();
+        document.getElementById('page-login').classList.remove('hidden');
+        document.getElementById('app-content').classList.add('hidden');
+    }
+});
+
+// Form Login Handler
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nip = document.getElementById('login-nip').value;
+    const password = document.getElementById('login-password').value;
+    const emailVirtual = `${nip}@dapen.com`; 
+
+    const { error } = await supabaseClient.auth.signInWithPassword({ 
+        email: emailVirtual, 
+        password: password 
+    });
+    if (error) alert("Gagal masuk: NIP atau Password Anda salah!");
+});
+
+async function handleLogout() {
+    matikanKamera();
+    await supabaseClient.auth.signOut();
+}
+
+// --- Manajemen Kamera & Waktu ---
+async function aktifkanKamera() {
+    const video = document.getElementById('webcam');
+    if (!video) return;
+    try {
+        streamKamera = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } },
+            audio: false
         });
+        video.srcObject = streamKamera;
+    } catch (err) {
+        console.error("Kamera gagal diakses:", err);
+    }
+}
 
-        // Handler Form Login
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const nip = document.getElementById('login-nip').value;
-            const password = document.getElementById('login-password').value;
-            const emailVirtual = `${nip}@dapen.com`; 
+function matikanKamera() {
+    if (streamKamera) {
+        streamKamera.getTracks().forEach(track => track.stop());
+        streamKamera = null;
+    }
+}
 
-            const { error } = await supabaseClient.auth.signInWithPassword({ 
-                email: emailVirtual, 
-                password: password 
-            });
-            if (error) alert("Gagal masuk: Nomor Urut Pegawai (NIP) atau Password Anda salah!");
-        });
+function updateWaktu() {
+    const sekarang = new Date();
+    const elClock = document.getElementById('live-clock');
+    if(elClock) elClock.innerText = sekarang.toLocaleTimeString('id-ID', { hour12: false }).replace(/\./g, ':');
+    const elDate = document.getElementById('live-date');
+    if(elDate) elDate.innerText = LearnFormatDate(sekarang);
+}
+function LearnFormatDate(date) {
+    return date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+setInterval(updateWaktu, 1000); updateWaktu();
 
-        async function handleLogout() {
-            matikanKamera();
-            await supabaseClient.auth.signOut();
-        }
+// --- Navigasi Multi Halaman ---
+function switchPage(page) {
+    const pages = ['page-karyawan', 'page-cuti-karyawan', 'page-admin', 'page-cuti-admin'];
+    pages.forEach(p => { const el = document.getElementById(p); if (el) el.classList.add('hidden'); });
+    
+    const navs = ['nav-karyawan', 'nav-cuti-karyawan', 'nav-admin', 'nav-cuti-admin'];
+    navs.forEach(n => { const el = document.getElementById(n); if (el) el.classList.remove('bg-indigo-50', 'text-indigo-600'); });
 
-        // --- Kontrol Kamera ---
-        async function aktifkanKamera() {
-            const video = document.getElementById('webcam');
-            if (!video) return;
-            try {
-                streamKamera = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } },
-                    audio: false
+    if (page === 'karyawan') {
+        document.getElementById('page-karyawan').classList.remove('hidden');
+        document.getElementById('nav-karyawan').classList.add('bg-indigo-50', 'text-indigo-600');
+        aktifkanKamera(); muatStatusHariIni();
+    } else if (page === 'cuti-karyawan') {
+        document.getElementById('page-cuti-karyawan').classList.remove('hidden');
+        document.getElementById('nav-cuti-karyawan').classList.add('bg-indigo-50', 'text-indigo-600');
+        matikanKamera(); muatRiwayatCutiKaryawan();
+    } else if (page === 'admin') {
+        document.getElementById('page-admin').classList.remove('hidden');
+        document.getElementById('nav-admin').classList.add('bg-indigo-50', 'text-indigo-600');
+        matikanKamera(); renderTabelAdmin();
+    } else if (page === 'cuti-admin') {
+        document.getElementById('page-cuti-admin').classList.remove('hidden');
+        document.getElementById('nav-cuti-admin').classList.add('bg-indigo-50', 'text-indigo-600');
+        matikanKamera(); muatPengajuanCutiAdmin();
+    }
+    lucide.createIcons();
+}
+
+// --- GPS & Absen ---
+function hitungJarak(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; 
+    const p1 = lat1 * Math.PI / 180; const p2 = lat2 * Math.PI / 180;
+    const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+function dapatkanLokasi(callback) {
+    if (!navigator.geolocation) { alert("GPS tidak didukung."); return; }
+    document.getElementById('location-status').innerText = "Mengunci GPS...";
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude; const lon = pos.coords.longitude;
+            const jarak = hitungJarak(lat, lon, KANTOR_LAT, KANTOR_LON);
+            document.getElementById('location-status').innerText = `Jarak: ${jarak.toFixed(0)}m dari kantor.`;
+            if (jarak > RADIUS_MAKSIMAL_METER) { alert(`Gagal! Jarak Anda ${jarak.toFixed(0)}m (Max ${RADIUS_MAKSIMAL_METER}m).`); return; }
+            callback(`${lat}, ${lon}`);
+        },
+        () => { alert("Akses GPS ditolak."); },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+
+function tangkapGambarDariKamera() {
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas-capture');
+    if (!video || !canvas || !streamKamera) return null;
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth || 480; canvas.height = video.videoHeight || 640;
+    ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.85));
+}
+
+function prosesAbsen(jenis) {
+    const sekarang = new Date();
+    const formatTanggal = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0]; 
+    const formatJam = `${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`;
+
+    supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', formatTanggal).maybeSingle()
+    .then(({ data: dataHariIni }) => {
+        if (dataHariIni && dataHariIni.status === 'Cuti') { alert("Anda sedang Cuti hari ini."); return; }
+        dapatkanLokasi(async (koordinat) => {
+            const fotoBlob = await tangkapGambarDariKamera();
+            if (!fotoBlob) { alert("Gagal ambil foto."); return; }
+            const namaFile = `${userAktif.id}_${formatTanggal}_${jenis.toLowerCase()}.jpg`;
+            
+            await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { upsert: true });
+            const { data: urlData } = supabaseClient.storage.from('foto-absen').getPublicUrl(namaFile);
+
+            if (jenis === 'Masuk') {
+                if (dataHariIni?.jam_masuk) { alert("Sudah absen masuk!"); return; }
+                let status = (sekarang.getHours() > BATAS_JAM_MASUK || (sekarang.getHours() === BATAS_JAM_MASUK && sekarang.getMinutes() > BATAS_MENIT_MASUK)) ? 'Terlambat' : 'Tepat Waktu';
+                await supabaseClient.from('absensi').insert({
+                    user_id: userAktif.id, nama: userAktif.user_metadata.full_name || userAktif.email.split('@')[0],
+                    tanggal: formatTanggal, jam_masuk: formatJam, status: status, lokasi: koordinat, foto_url: urlData.publicUrl
                 });
-                video.srcObject = streamKamera;
-            } catch (err) {
-                console.error("Gagal membuka kamera:", err);
-            }
-        }
-
-        function matikanKamera() {
-            if (streamKamera) {
-                streamKamera.getTracks().forEach(track => track.stop());
-                streamKamera = null;
-            }
-        }
-
-        // --- Jam Realtime ---
-        function updateWaktu() {
-            const sekarang = new Date();
-            const elClock = document.getElementById('live-clock');
-            if(elClock) elClock.innerText = sekarang.toLocaleTimeString('id-ID', { hour12: false }).replace(/\./g, ':');
-            const elDate = document.getElementById('live-date');
-            if(elDate) elDate.innerText = sekarang.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        }
-        setInterval(updateWaktu, 1000); updateWaktu();
-
-        // --- GPS Haversine ---
-        function hitungJarak(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; 
-            const p1 = lat1 * Math.PI / 180;
-            const p2 = lat2 * Math.PI / 180;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-        }
-
-        function dapatkanLokasi(callback) {
-            if (!navigator.geolocation) {
-                alert("Browser tidak mendukung fitur GPS.");
-                return;
-            }
-            document.getElementById('location-status').innerText = "Sedang mengunci lokasi GPS...";
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    const koordinat = `${lat}, ${lon}`;
-                    const jarak = hitungJarak(lat, lon, KANTOR_LAT, KANTOR_LON);
-                    document.getElementById('location-status').innerText = `Jarak Anda: ${jarak.toFixed(0)} meter dari kantor.`;
-
-                    if (jarak > RADIUS_MAKSIMAL_METER) {
-                        alert(`Gagal Absen! Jarak Anda ${jarak.toFixed(0)} meter dari kantor (Maksimal ${RADIUS_MAKSIMAL_METER}m).`);
-                        return;
-                    }
-                    callback(koordinat);
-                },
-                (error) => {
-                    document.getElementById('location-status').innerText = "Gagal mengambil lokasi GPS.";
-                    alert("Akses GPS ditolak. Aktifkan GPS pada browser Anda.");
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        }
-
-        // --- Navigasi Halaman Multi-View ---
-        function switchPage(page) {
-            const pages = ['page-karyawan', 'page-cuti-karyawan', 'page-admin', 'page-cuti-admin'];
-            pages.forEach(p => {
-                const el = document.getElementById(p);
-                if (el) el.classList.add('hidden');
-            });
-            
-            const navs = ['nav-karyawan', 'nav-cuti-karyawan', 'nav-admin', 'nav-cuti-admin'];
-            navs.forEach(n => {
-                const el = document.getElementById(n);
-                if (el) el.classList.remove('bg-indigo-50', 'text-indigo-600');
-            });
-
-            if (page === 'karyawan') {
-                document.getElementById('page-karyawan').classList.remove('hidden');
-                document.getElementById('nav-karyawan').classList.add('bg-indigo-50', 'text-indigo-600');
-                aktifkanKamera(); muatStatusHariIni();
-            } else if (page === 'cuti-karyawan') {
-                document.getElementById('page-cuti-karyawan').classList.remove('hidden');
-                document.getElementById('nav-cuti-karyawan').classList.add('bg-indigo-50', 'text-indigo-600');
-                matikanKamera(); muatRiwayatCutiKaryawan();
-            } else if (page === 'admin') {
-                document.getElementById('page-admin').classList.remove('hidden');
-                document.getElementById('nav-admin').classList.add('bg-indigo-50', 'text-indigo-600');
-                matikanKamera(); renderTabelAdmin();
-            } else if (page === 'cuti-admin') {
-                document.getElementById('page-cuti-admin').classList.remove('hidden');
-                document.getElementById('nav-cuti-admin').classList.add('bg-indigo-50', 'text-indigo-600');
-                matikanKamera(); muatPengajuanCutiAdmin();
-            }
-            lucide.createIcons();
-        }
-
-        function tangkapGambarDariKamera() {
-            const video = document.getElementById('webcam');
-            const canvas = document.getElementById('canvas-capture');
-            if (!video || !canvas || !streamKamera) return null;
-            const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth || 480;
-            canvas.height = video.videoHeight || 640;
-            context.translate(canvas.width, 0);
-            context.scale(-1, 1);
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            return new Promise((resolve) => { canvas.toBlob((blob) => { resolve(blob); }, 'image/jpeg', 0.85); });
-        }
-
-        // --- Logika Absensi ---
-        function prosesAbsen(jenis) {
-            const sekarang = new Date();
-            const formatTanggal = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0]; 
-            const formatJam = `${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`;
-
-            supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', formatTanggal).maybeSingle()
-            .then(({ data: dataHariIni }) => {
-                
-                if (dataHariIni && dataHariIni.status === 'Cuti') {
-                    alert("Gagal! Anda sedang dalam masa cuti resmi hari ini.");
-                    return;
-                }
-
-                dapatkanLokasi(async (koordinat) => {
-                    const fotoBlob = await tangkapGambarDariKamera();
-                    if (!fotoBlob) { alert("Gagal mengambil foto."); return; }
-
-                    document.getElementById('location-status').innerText = "Mengupload foto selfie...";
-
-                    const namaFile = `${userAktif.id}_${formatTanggal}_${jenis.toLowerCase()}.jpg`;
-                    const { error: errorUpload } = await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { 
-                        cacheControl: '3600', 
-                        upsert: true
-                    });
-                    if (errorUpload) { alert("Gagal upload foto: " + errorUpload.message); return; }
-
-                    const { data: urlData } = supabaseClient.storage.from('foto-absen').getPublicUrl(namaFile);
-                    const publicFotoUrl = urlData.publicUrl;
-
-                    if (jenis === 'Masuk') {
-                        if (dataHariIni && dataHariIni.jam_masuk) { alert("Anda sudah absen masuk!"); return; }
-                        let status = (sekarang.getHours() > BATAS_JAM_MASUK || (sekarang.getHours() === BATAS_JAM_MASUK && sekarang.getMinutes() > BATAS_MENIT_MASUK)) ? 'Terlambat' : 'Tepat Waktu';
-
-                        await supabaseClient.from('absensi').insert({
-                            user_id: userAktif.id,
-                            nama: userAktif.user_metadata.full_name || userAktif.email.split('@')[0],
-                            tanggal: formatTanggal,
-                            jam_masuk: formatJam,
-                            status: status,
-                            lokasi: koordinat,
-                            foto_url: publicFotoUrl
-                        });
-                        alert(`Absen Masuk Sukses pukul ${formatJam}`);
-                    } else {
-                        if (!dataHariIni) { alert("Belum absen masuk!"); return; }
-                        if (dataHariIni.jam_pulang) { alert("Anda sudah absen pulang!"); return; }
-
-                        await supabaseClient.from('absensi').update({ jam_pulang: formatJam, foto_url: publicFotoUrl }).eq('id', dataHariIni.id);
-                        alert(`Absen Pulang Sukses pukul ${formatJam}`);
-                    }
-                    muatStatusHariIni();
-                });
-            });
-        }
-
-        async function muatStatusHariIni() {
-            if (!userAktif) return;
-            const sekarang = new Date();
-            const tglHariIni = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0];
-            
-            let { data } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', tglHariIni).maybeSingle();
-            
-            const btnMasuk = document.getElementById('btn-absen-masuk');
-            const btnPulang = document.getElementById('btn-absen-pulang');
-            
-            if (btnMasuk && btnPulang) {
-                btnMasuk.disabled = false; btnMasuk.style.opacity = '1'; btnMasuk.style.cursor = 'pointer';
-                btnPulang.disabled = false; btnPulang.style.opacity = '1'; btnPulang.style.cursor = 'pointer';
-            }
-
-            const elMasuk = document.getElementById('today-masuk');
-            const elPulang = document.getElementById('today-pulang');
-            if(elMasuk) elMasuk.innerText = data?.jam_masuk || '-';
-            if(elPulang) elPulang.innerText = data?.jam_pulang || '-';
-
-            if (data?.status === 'Cuti') {
-                matikanKamera();
-                const elLoc = document.getElementById('location-status');
-                if(elLoc) {
-                    elLoc.innerHTML = `
-                        <div class="mt-1 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl font-medium text-sm flex items-center justify-center gap-2 w-full">
-                            <span>📅 Hari ini Anda terdaftar sedang melaksanakan Cuti Resmi.</span>
-                        </div>
-                    `;
-                }
-                if (btnMasuk && btnPulang) {
-                    btnMasuk.disabled = true; btnMasuk.style.opacity = '0.4'; btnMasuk.style.cursor = 'not-allowed';
-                    btnPulang.disabled = true; btnPulang.style.opacity = '0.4'; btnPulang.style.cursor = 'not-allowed';
-                }
-            }
-        }
-
-        // --- Logika Fitur Cuti Karyawan ---
-        async function ajukanCuti(e) {
-            e.preventDefault();
-            const jenis = document.getElementById('cuti-jenis').value;
-            const mulai = document.getElementById('cuti-mulai').value;
-            const selesai = document.getElementById('cuti-selesai').value;
-            const alasan = document.getElementById('cuti-alasan').value;
-            const nip = userAktif.email.split('@')[0];
-
-            if (new Date(mulai) > new Date(selesai)) {
-                alert("Tanggal mulai tidak boleh melebihi tanggal selesai!");
-                return;
-            }
-
-            const { error } = await supabaseClient.from('pengajuan_cuti').insert({
-                user_id: userAktif.id,
-                nama: userAktif.user_metadata.full_name || nip,
-                nip: nip,
-                jenis_cuti: jenis,
-                tanggal_mulai: mulai,
-                tanggal_selesai: selesai,
-                status: 'Pending',
-                alasan: alasan
-            });
-
-            if (error) {
-                alert("Gagal mengajukan cuti: " + error.message);
             } else {
-                alert("Permohonan cuti berhasil dikirim! Menunggu persetujuan admin.");
-                document.getElementById('cuti-form').reset();
-                muatRiwayatCutiKaryawan();
+                if (!dataHariIni) { alert("Belum absen masuk!"); return; }
+                if (dataHariIni.jam_pulang) { alert("Sudah absen pulang!"); return; }
+                await supabaseClient.from('absensi').update({ jam_pulang: formatJam, foto_url: urlData.publicUrl }).eq('id', dataHariIni.id);
             }
-        }
+            alert(`Absen ${jenis} Sukses!`); muatStatusHariIni();
+        });
+    });
+}
 
-        async function muatRiwayatCutiKaryawan() {
+async function muatStatusHariIni() {
+    if (!userAktif) return;
+    const sekarang = new Date();
+    const tgl = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0];
+    let { data } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', tgl).maybeSingle();
+    
+    if(document.getElementById('today-masuk')) document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
+    if(document.getElementById('today-pulang')) document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
+}
+
+// --- MANAJEMEN CUTI KARYAWAN (FIXED) ---
+async function ajukanCuti(e) {
+    e.preventDefault();
+    const jenis = document.getElementById('cuti-jenis').value;
+    const mulai = document.getElementById('cuti-mulai').value;
+    const selesai = document.getElementById('cuti-selesai').value;
+    const alasan = document.getElementById('cuti-alasan').value;
+    const nip = userAktif.email.split('@')[0];
+
+    if (new Date(mulai) > new Date(selesai)) { alert("Tanggal salah!"); return; }
+
+    await supabaseClient.from('pengajuan_cuti').insert({
+        user_id: userAktif.id, nama: userAktif.user_metadata.full_name || nip, nip: nip,
+        jenis_cuti: jenis, tanggal_mulai: mulai, tanggal_selesai: selesai, status: 'Pending', alasan: alasan
+    });
+    alert("Cuti berhasil diajukan!"); document.getElementById('cuti-form').reset(); muatRiwayatCutiKaryawan();
+}
+
+async function muatRiwayatCutiKaryawan() {
     let { data: listCuti } = await supabaseClient.from('pengajuan_cuti').select('*').eq('user_id', userAktif.id).order('created_at', { ascending: false });
     const tbody = document.getElementById('table-cuti-karyawan-body');
     if(!tbody) return;
@@ -533,285 +444,104 @@
     
     listCuti?.forEach(c => {
         let badgeColor = c.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : c.status === 'Rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
-        
-        // Buat baris tabel baru (DOM Element) secara aman agar tidak patah karena karakter string
         const tr = document.createElement('tr');
-        
-        let kolomAksiHtml = `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span>`;
-        
         tr.innerHTML = `
             <td class="p-3 font-medium text-slate-700">${c.jenis_cuti}</td>
             <td class="p-3 text-xs text-slate-500">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td>
             <td class="p-3 text-slate-600">${c.alasan}</td>
-            <td class="p-3 flex items-center gap-2" id="aksi-${c.id}">
-                ${kolomAksiHtml}
+            <td class="p-3 flex items-center gap-2" id="wrapper-aksi-${c.id}">
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span>
             </td>
         `;
-        
         tbody.appendChild(tr);
 
-        // Jika statusnya disetujui, buat tombol cetak menggunakan addEventListener (100% Aman dari error HTML)
         if (c.status === 'Approved') {
-            const btnCetak = document.createElement('button');
-            btnCetak.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-medium px-2 py-0.5 rounded transition inline-flex items-center gap-1 cursor-pointer";
-            btnCetak.innerText = "Cetak Form";
-            
-            // Masukkan data objek objek cuti langsung ke memori tombol
-            btnCetak.addEventListener('click', () => {
-                bukaHalamanCetakLangsung(c);
-            });
-            
-            document.getElementById(`aksi-${c.id}`).appendChild(btnCetak);
+            const btn = document.createElement('button');
+            btn.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-medium px-2 py-0.5 rounded cursor-pointer";
+            btn.innerText = "Cetak Form";
+            btn.addEventListener('click', () => { eksekusiTampilanCetak(c); });
+            document.getElementById(`wrapper-aksi-${c.id}`).appendChild(btn);
         }
     });
 }
 
-// FUNGSI UTAMA BARU UNTUK MEMBUKA HALAMAN CETAK (ANTI-BLOKIR & ANTI-ERROR STRINGS)
-function bukaHalamanCetakLangsung(dataCuti) {
+// --- FUNGSI HALAMAN CETAK ANTI BLOKIR ---
+function eksekusiTampilanCetak(dataCuti) {
     try {
         const appContent = document.getElementById('app-content');
-        if (!appContent) return;
-
-        // Buat penampung halaman cetak temporer
         const areaCetak = document.createElement('div');
         areaCetak.id = 'print-temporary-area';
-        areaCetak.className = 'bg-white p-6 font-sans text-slate-950 min-h-screen flex flex-col justify-center items-center absolute top-0 left-0 w-full z-[9999]';
+        areaCetak.className = 'bg-white p-6 text-slate-950 min-h-screen flex flex-col justify-center items-center absolute top-0 left-0 w-full z-[9999]';
 
         areaCetak.innerHTML = `
             <div class="w-full max-w-2xl border border-slate-300 p-8 rounded-lg shadow-sm bg-white">
                 <div class="text-center border-b-2 border-slate-900 pb-4 mb-6">
-                    <h1 class="text-xl font-bold uppercase tracking-wide text-indigo-900">Dana Pensiun Bank Jateng</h1>
-                    <p class="text-xs text-slate-500">Jl. Ki Mangunsarkoro No.25, Semarang, Jawa Tengah</p>
-                    <h2 class="text-md font-semibold mt-4 tracking-wider underline">SURAT IJIN CUTI KARYAWAN</h2>
-                    <p class="text-xs text-slate-400 mt-1">ID Pengajuan: ${dataCuti.id.substring(0,8).toUpperCase()}</p>
+                    <h1 class="text-xl font-bold uppercase text-indigo-900">Dana Pensiun Bank Jateng</h1>
+                    <p class="text-xs text-slate-500">Jl. Pemuda No. 142, Semarang</p>
+                    <h2 class="text-md font-semibold mt-4 underline">SURAT IJIN CUTI KARYAWAN</h2>
                 </div>
-
                 <div class="space-y-4 text-sm">
-                    <p class="mb-4">Menerangkan bahwa permohonan cuti karyawan berikut telah <strong class="text-emerald-600">DISETUJUI</strong> oleh pihak manajemen:</p>
-                    
-                    <table class="w-full border-collapse text-left">
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600 w-1/3">Nama Karyawan</td><td class="py-2 text-slate-900">: ${dataCuti.nama}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">NIP Pegawai</td><td class="py-2 text-slate-900">: ${dataCuti.nip || '-'}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Jenis Cuti</td><td class="py-2 text-slate-900">: ${dataCuti.jenis_cuti}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Tanggal Durasi</td><td class="py-2 text-slate-900 font-mono">: ${dataCuti.tanggal_mulai} s/d ${dataCuti.tanggal_selesai}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Alasan</td><td class="py-2 text-slate-900">: ${dataCuti.alasan}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Status</td><td class="py-2 text-emerald-600 font-bold">: SAH & DISETUJUI VIA E-ABSENSI</td></tr>
+                    <p>Menerangkan bahwa permohonan cuti karyawan telah <strong class="text-emerald-600">DISETUJUI</strong>:</p>
+                    <table class="w-full text-left">
+                        <tr class="border-b border-slate-100"><td class="py-2 w-1/3 font-semibold">Nama Karyawan</td><td>: ${dataCuti.nama}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold">NIP Pegawai</td><td>: ${dataCuti.nip || '-'}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold">Jenis Cuti</td><td>: ${dataCuti.jenis_cuti}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold">Durasi</td><td>: ${dataCuti.tanggal_mulai} s/d ${dataCuti.tanggal_selesai}</td></tr>
+                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold">Alasan</td><td>: ${dataCuti.alasan}</td></tr>
                     </table>
                 </div>
-
-                <div class="mt-12 flex justify-between text-sm">
-                    <div class="text-center"><p class="text-xs text-slate-400 mb-14">Pemohon,</p><p class="font-semibold underline">${dataCuti.nama}</p></div>
-                    <div class="text-center"><p class="text-xs text-slate-400 mb-14">Semarang, Mengetahui,</p><p class="font-semibold underline">Manajemen Dapen</p></div>
-                </div>
-
-                <div class="mt-8 pt-4 border-t border-slate-200 text-center flex justify-center gap-2 style-print-hidden">
-                    <button id="btn-do-print" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl text-xs shadow-sm transition cursor-pointer">🖨️ Cetak / Save PDF</button>
-                    <button id="btn-close-print" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium px-4 py-2 rounded-xl text-xs transition cursor-pointer">Kembali ke Aplikasi</button>
+                <div class="mt-8 pt-4 border-t text-center flex justify-center gap-2 style-print-hidden">
+                    <button id="real-print-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-medium">🖨️ Cetak / Save PDF</button>
+                    <button id="real-close-btn" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-xs font-medium">Kembali</button>
                 </div>
             </div>
-            <style>
-                @media print { .style-print-hidden { display: none !important; } body { background: white; } }
-            </style>
+            <style>@media print { .style-print-hidden { display: none !important; } }</style>
         `;
 
-        // Sembunyikan isi app utama, tempelkan kertas surat ke bodi
         appContent.classList.add('hidden');
         document.body.appendChild(areaCetak);
 
-        // Aksi cetak
-        document.getElementById('btn-do-print').onclick = function() { window.print(); };
-
-        // Aksi kembali (Menghapus lembar cetak dan memunculkan kembali aplikasi utama)
-        document.getElementById('btn-close-print').onclick = function() {
+        document.getElementById('real-print-btn').onclick = function() { window.print(); };
+        document.getElementById('real-close-btn').onclick = function() {
             areaCetak.remove();
             appContent.classList.remove('hidden');
         };
-
-    } catch (err) {
-        console.error(err);
-        alert("Gagal memproses formulir cetak.");
-    }
+    } catch (e) { alert("Gagal memuat halaman cetak."); }
 }
 
-        // --- Logika Panel Admin ---
-        async function renderTabelAdmin() {
-            let { data: semuaAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
-            const tbody = document.getElementById('table-body');
-            if(!tbody) return;
-            tbody.innerHTML = '';
-            semuaAbsen?.forEach(item => {
-                const badgeClass = item.status === 'Tepat Waktu' ? 'bg-emerald-50 text-emerald-700' : item.status === 'Cuti' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700';
-                const kolomFoto = item.foto_url ? `<a href="${item.foto_url}" target="_blank" class="text-indigo-600 hover:underline flex items-center gap-0.5"><i data-lucide="image" class="w-3.5 h-3.5"></i>Lihat</a>` : `-`;
-                tbody.innerHTML += `
-                    <tr>
-                        <td class="p-4 font-medium">${item.nama}</td>
-                        <td class="p-4">${item.tanggal}</td>
-                        <td class="p-4 font-mono">${item.jam_masuk || '-'}</td>
-                        <td class="p-4 font-mono">${item.jam_pulang || '-'}</td>
-                        <td class="p-4">${kolomFoto}</td>
-                        <td class="p-4"><span class="px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}">${item.status}</span></td>
-                    </tr>
-                `;
-            });
-            lucide.createIcons();
-        }
-
-        async function muatPengajuanCutiAdmin() {
-            let { data: listCuti } = await supabaseClient.from('pengajuan_cuti').select('*').order('created_at', { ascending: false });
-            const tbody = document.getElementById('table-cuti-admin-body');
-            if(!tbody) return;
-            tbody.innerHTML = '';
-            
-            listCuti?.forEach(c => {
-                let aksiTombol = '';
-                if (c.status === 'Pending') {
-                    aksiTombol = `
-                        <div class="flex items-center justify-center gap-2">
-                            <button onclick="setujuiCuti('${c.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1 rounded-lg transition font-medium cursor-pointer">Setujui</button>
-                            <button onclick="tolakCuti('${c.id}')" class="bg-rose-600 hover:bg-rose-700 text-white text-xs px-2.5 py-1 rounded-lg transition font-medium cursor-pointer">Tolak</button>
-                        </div>
-                    `;
-                } else {
-                    let badgeColor = c.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
-                    aksiTombol = `<div class="text-center"><span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span></div>`;
-                }
-
-                tbody.innerHTML += `
-                    <tr>
-                        <td class="p-4 font-medium text-slate-700">${c.nama} <span class="block text-xs text-slate-400 font-normal">NIP: ${c.nip || '-'}</span></td>
-                        <td class="p-4 text-slate-600">${c.jenis_cuti}</td>
-                        <td class="p-4 text-xs text-slate-500 font-mono">${c.tanggal_mulai} s/d <br>${c.tanggal_selesai}</td>
-                        <td class="p-4 text-slate-600 max-w-[150px] truncate" title="${c.alasan}">${c.alasan}</td>
-                        <td class="p-4">${aksiTombol}</td>
-                    </tr>
-                `;
-            });
-        }
-
-        async function setujuiCuti(idPengajuan) {
-            if (!confirm("Apakah Anda yakin ingin menyetujui permohonan cuti ini?")) return;
-
-            try {
-                let { data: cuti, error: errFetch } = await supabaseClient.from('pengajuan_cuti').select('*').eq('id', idPengajuan).single();
-                if (errFetch || !cuti) { alert("Gagal mengambil data pengajuan cuti."); return; }
-
-                const { error: errUpdate } = await supabaseClient.from('pengajuan_cuti').update({ status: 'Approved' }).eq('id', idPengajuan);
-                if (errUpdate) { alert("Gagal memperbarui status cuti."); return; }
-
-                const tglMulai = new Date(cuti.tanggal_mulai);
-                const tglSelesai = new Date(cuti.tanggal_selesai);
-                let listAbsenCuti = [];
-
-                for (let d = new Date(tglMulai); d <= tglSelesai; d.setDate(d.getDate() + 1)) {
-                    const formatTgl = d.toISOString().split('T')[0];
-                    listAbsenCuti.push({
-                        user_id: cuti.user_id,
-                        nama: cuti.nama,
-                        tanggal: formatTgl,
-                        jam_masuk: 'CUTI',
-                        jam_pulang: 'CUTI',
-                        status: 'Cuti',
-                        lokasi: 'Masa Cuti Resmi',
-                        foto_url: null
-                    });
-                }
-
-                const { error: errAbsen } = await supabaseClient.from('absensi').insert(listAbsenCuti);
-                if (errAbsen) console.error("Sinkronisasi absensi gagal:", errAbsen.message);
-
-                alert("Cuti disetujui dan otomatis sinkron ke daftar absensi!");
-                muatPengajuanCutiAdmin();
-            } catch (error) {
-                console.error(error);
-                alert("Terjadi kesalahan sistem.");
-            }
-        }
-
-        async function tolakCuti(idPengajuan) {
-            if (!confirm("Apakah Anda yakin ingin menolak permohonan cuti ini?")) return;
-            const { error } = await supabaseClient.from('pengajuan_cuti').update({ status: 'Rejected' }).eq('id', idPengajuan);
-            if (error) {
-                alert("Gagal menolak cuti: " + error.message);
-            } else {
-                alert("Permohonan cuti telah ditolak.");
-                muatPengajuanCutiAdmin();
-            }
-        }
-
-        function eksporCSV() { alert("Fitur ekspor CSV siap dikonfigurasi."); }
-       function cetakFormulirCuti(dataTerenkripsi) {
-    try {
-        // Dekode data cuti dari baris tabel
-        const dataMentah = decodeURIComponent(escape(atob(dataTerenkripsi)));
-        const dataCuti = JSON.parse(dataMentah);
-
-        // Ambil elemen utama aplikasi untuk disembunyikan sementara
-        const appContent = document.getElementById('app-content');
-        if (!appContent) return;
-
-        // Buat elemen penampung cetak khusus
-        const areaCetak = document.createElement('div');
-        areaCetak.id = 'print-temporary-area';
-        areaCetak.className = 'bg-white p-6 font-sans text-slate-950 min-h-screen flex flex-col justify-center items-center';
-
-        // Desain template surat resmi di dalam layar aktif
-        areaCetak.innerHTML = `
-            <div class="w-full max-w-2xl border border-slate-300 p-8 rounded-lg shadow-sm bg-white">
-                <div class="text-center border-b-2 border-slate-900 pb-4 mb-6">
-                    <h1 class="text-xl font-bold uppercase tracking-wide text-indigo-900">Dana Pensiun Bank Jateng</h1>
-                    <p class="text-xs text-slate-500">Jl. Pemuda No. 142, Semarang, Jawa Tengah</p>
-                    <h2 class="text-md font-semibold mt-4 tracking-wider underline">SURAT IJIN CUTI KARYAWAN</h2>
-                    <p class="text-xs text-slate-400 mt-1">ID Pengajuan: ${dataCuti.id.substring(0,8).toUpperCase()}</p>
-                </div>
-
-                <div class="space-y-4 text-sm">
-                    <p class="mb-4">Menerangkan bahwa permohonan cuti karyawan berikut telah **DISETUJUI** oleh pihak manajemen:</p>
-                    
-                    <table class="w-full border-collapse text-left">
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600 w-1/3">Nama Karyawan</td><td class="py-2 text-slate-900">: ${dataCuti.nama}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">NIP Pegawai</td><td class="py-2 text-slate-900">: ${dataCuti.nip || '-'}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Jenis Cuti</td><td class="py-2 text-slate-900">: ${dataCuti.jenis_cuti}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Tanggal Durasi</td><td class="py-2 text-slate-900 font-mono">: ${dataCuti.tanggal_mulai} s/d ${dataCuti.tanggal_selesai}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Alasan</td><td class="py-2 text-slate-900">: ${dataCuti.alasan}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2 font-semibold text-slate-600">Status</td><td class="py-2 text-emerald-600 font-bold">: SAH & DISETUJUI</td></tr>
-                    </table>
-                </div>
-
-                <div class="mt-12 flex justify-between text-sm">
-                    <div class="text-center"><p class="text-xs text-slate-400 mb-14">Pemohon,</p><p class="font-semibold underline">${dataCuti.nama}</p></div>
-                    <div class="text-center"><p class="text-xs text-slate-400 mb-14">Semarang, Mengetahui,</p><p class="font-semibold underline">Manajemen Dapen</p></div>
-                </div>
-
-                <div class="mt-8 pt-4 border-t border-slate-200 text-center flex justify-center gap-2 style-print-hidden">
-                    <button id="btn-do-print" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-xl text-xs shadow-sm transition cursor-pointer">🖨️ Cetak / Save PDF</button>
-                    <button id="btn-close-print" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium px-4 py-2 rounded-xl text-xs transition cursor-pointer">Kembali ke Aplikasi</button>
-                </div>
-            </div>
-            <style>
-                @media print { .style-print-hidden { display: none !important; } body { background: white; } }
-            </style>
-        `;
-
-        // Sembunyikan aplikasi utama dan tampilkan area surat cuti
-        appContent.classList.add('hidden');
-        document.body.appendChild(areaCetak);
-
-        // Pasang fungsi tombol Cetak
-        document.getElementById('btn-do-print').onclick = function() {
-            window.print();
-        };
-
-        // Pasang fungsi tombol Kembali (Menghancurkan halaman surat dan memulihkan aplikasi)
-        document.getElementById('btn-close-print').onclick = function() {
-            areaCetak.remove();
-            appContent.classList.remove('hidden');
-        };
-
-    } catch (err) {
-        console.error(err);
-        alert("Gagal memproses formulir cetak.");
-    }
+// --- PANEL ADMIN (ABSEN & CUTI) ---
+async function renderTabelAdmin() {
+    let { data: semuaAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
+    const tbody = document.getElementById('table-body');
+    if(!tbody) return; tbody.innerHTML = '';
+    semuaAbsen?.forEach(item => {
+        const badgeClass = item.status === 'Tepat Waktu' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
+        tbody.innerHTML += `<tr><td class="p-4 font-medium">${item.nama}</td><td class="p-4">${item.tanggal}</td><td class="p-4">${item.jam_masuk || '-'}</td><td class="p-4">${item.jam_pulang || '-'}</td><td class="p-4"><span class="px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}">${item.status}</span></td></tr>`;
+    });
 }
+
+async function muatPengajuanCutiAdmin() {
+    let { data: listCuti } = await supabaseClient.from('pengajuan_cuti').select('*').order('created_at', { ascending: false });
+    const tbody = document.getElementById('table-cuti-admin-body');
+    if(!tbody) return; tbody.innerHTML = '';
+    listCuti?.forEach(c => {
+        let aksiTombol = c.status === 'Pending' ? `<div class="flex gap-2"><button onclick="setujuiCuti('${c.id}')" class="bg-emerald-600 text-white text-xs px-2 py-1 rounded">Setujui</button><button onclick="tolakCuti('${c.id}')" class="bg-rose-600 text-white text-xs px-2 py-1 rounded">Tolak</button></div>` : c.status;
+        tbody.innerHTML += `<tr><td class="p-4 font-medium">${c.nama}</td><td class="p-4">${c.jenis_cuti}</td><td class="p-4">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td><td class="p-4">${c.alasan}</td><td class="p-4">${aksiTombol}</td></tr>`;
+    });
+}
+
+async function setujuiCuti(id) {
+    if (!confirm("Setujui cuti ini?")) return;
+    await supabaseClient.from('pengajuan_cuti').update({ status: 'Approved' }).eq('id', id);
+    alert("Cuti disetujui!"); muatPengajuanCutiAdmin();
+}
+async function tolakCuti(id) {
+    if (!confirm("Tolak cuti ini?")) return;
+    await supabaseClient.from('pengajuan_cuti').update({ status: 'Rejected' }).eq('id', id);
+    alert("Cuti ditolak!"); muatPengajuanCutiAdmin();
+}
+
+function eksporCSV() { alert("Fitur Siap."); }
     </script>
 </body>
 </html>
