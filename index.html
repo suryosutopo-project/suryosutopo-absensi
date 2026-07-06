@@ -14,7 +14,7 @@
         <div class="w-full max-w-sm space-y-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div class="text-center space-y-2">
                 <div class="flex items-center justify-center">    
-                    <img src="https://czrfgfsktsnvdwmjpzbx.supabase.co/storage/v1/object/public/aset/LogoDapen-1.png">
+                    <img src="https://czrfgfsktsnvdwmjpzbx.supabase.co/storage/v1/object/public/aset/LogoDapen-1.png" alt="Logo">
                 </div>              
                 <h1 class="text-2xl font-bold text-slate-900">Selamat Datang</h1>
                 <p class="text-sm text-slate-500">Silahkan masuk ke akun Anda</p>
@@ -205,7 +205,7 @@
     </div>
 
     <script>
-      // --- KONFIGURASI SUPABASE ---
+// --- KONFIGURASI SUPABASE ---
 const SUPABASE_URL = "https://czrfgfsktsnvdwmjpzbx.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6cmZnZnNrdHNudmR3bWpwemJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NzkyNTEsImV4cCI6MjA5ODI1NTI1MX0.8xF64JQQZHst1iY-PdO8qWEaeCpF5S5W3cqvU8tyzZY";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -321,15 +321,16 @@ function switchPage(page) {
         document.getElementById('page-cuti-karyawan').classList.remove('hidden');
         document.getElementById('nav-cuti-karyawan').classList.add('bg-indigo-50', 'text-indigo-600');
         matikanKamera(); muatRiwayatCutiKaryawan();
-   } else if (page === 'admin') {
+    } else if (page === 'admin') {
         document.getElementById('page-admin').classList.remove('hidden');
         document.getElementById('nav-admin').classList.add('bg-indigo-50', 'text-indigo-600');
         matikanKamera(); 
-        muatRiwayatAbsenAdmin(); // <-- PASTIKAN BARIS INI ADA UNTUK MEMANGGIL DATA
+        muatRiwayatAbsenAdmin();
     } else if (page === 'cuti-admin') {
         document.getElementById('page-cuti-admin').classList.remove('hidden');
         document.getElementById('nav-cuti-admin').classList.add('bg-indigo-50', 'text-indigo-600');
-        matikanKamera(); // Tambahkan logika admin persetujuan cuti Anda di sini
+        matikanKamera(); 
+        muatRiwayatCutiAdmin(); // PANGGIL DATA CUTI UNTUK ADMIN
     }
     lucide.createIcons();
 }
@@ -412,6 +413,7 @@ async function muatStatusHariIni() {
     if(document.getElementById('today-masuk')) document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
     if(document.getElementById('today-pulang')) document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
 }
+
 // --- MANAJEMEN ADMIN: MUAT RIWAYAT ABSENSI ---
 async function muatRiwayatAbsenAdmin() {
     const tbody = document.getElementById('table-body');
@@ -419,7 +421,6 @@ async function muatRiwayatAbsenAdmin() {
     
     tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Memuat data absensi...</td></tr>';
 
-    // Ambil seluruh data absensi dari Supabase, urutkan dari tanggal terbaru
     let { data: listAbsen, error } = await supabaseClient
         .from('absensi')
         .select('*')
@@ -437,16 +438,14 @@ async function muatRiwayatAbsenAdmin() {
         return;
     }
 
-    tbody.innerHTML = ''; // Bersihkan loader
+    tbody.innerHTML = '';
     
     listAbsen.forEach(absen => {
-        // Tentukan warna badge status
         let statusColor = 'bg-slate-100 text-slate-700';
         if (absen.status === 'Tepat Waktu') statusColor = 'bg-emerald-50 text-emerald-700 font-semibold';
         if (absen.status === 'Terlambat') statusColor = 'bg-amber-50 text-amber-700 font-semibold';
         if (absen.status === 'Cuti') statusColor = 'bg-indigo-50 text-indigo-700 font-semibold';
 
-        // Cek jika foto_url tersedia
         let komponenFoto = '<span class="text-xs text-slate-400 italic">Tidak ada foto</span>';
         if (absen.foto_url) {
             komponenFoto = `
@@ -471,17 +470,17 @@ async function muatRiwayatAbsenAdmin() {
         tbody.appendChild(tr);
     });
 
-    // Refresh ikon Lucide agar ikon gambar muncul di tabel
     lucide.createIcons();
 }
-// --- MANAJEMEN ADMIN: MUAT RIWAYAT PERSETUJUAN CUTI (SUDAH DIPERBAIKI) ---
+
+// --- MANAJEMEN ADMIN: MUAT RIWAYAT PERSETUJUAN CUTI ---
 async function muatRiwayatCutiAdmin() {
-    const tbody = document.getElementById('table-cuti-body');
+    // DISESUAIKAN DENGAN ID YANG ADA DI HTML YAITU 'table-cuti-admin-body'
+    const tbody = document.getElementById('table-cuti-admin-body');
     if (!tbody) return;
     
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Memuat pengajuan cuti...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Memuat pengajuan cuti...</td></tr>';
 
-    // MENGGUNAKAN NAMA TABEL ASLI ANDA: pengajuan_cuti
     let { data: listCuti, error } = await supabaseClient
         .from('pengajuan_cuti') 
         .select('*')
@@ -489,52 +488,45 @@ async function muatRiwayatCutiAdmin() {
 
     if (error) {
         console.error("Gagal mengambil data cuti:", error);
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500 font-medium">Gagal memuat: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-rose-500 font-medium">Gagal memuat: ${error.message}</td></tr>`;
         return;
     }
 
     if (!listCuti || listCuti.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada riwayat pengajuan cuti.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Belum ada riwayat pengajuan cuti.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = ''; // Bersihkan loader
+    tbody.innerHTML = '';
     
     listCuti.forEach(item => {
-        let badgeStyle = 'bg-amber-50 text-amber-700 font-medium'; // Default: Pending
-        if (item.status === 'Disetujui') badgeStyle = 'bg-emerald-50 text-emerald-700 font-bold';
-        if (item.status === 'Ditolak') badgeStyle = 'bg-rose-50 text-rose-700 font-bold';
+        let badgeStyle = 'bg-amber-50 text-amber-700 font-medium';
+        if (item.status === 'Disetujui' || item.status === 'Approved') badgeStyle = 'bg-emerald-50 text-emerald-700 font-bold';
+        if (item.status === 'Ditolak' || item.status === 'Rejected') badgeStyle = 'bg-rose-50 text-rose-700 font-bold';
 
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50/80 transition border-b border-slate-100";
         tr.innerHTML = `
-            <td class="p-4 font-medium text-slate-900">${item.nama || '-'}</td>
+            <td class="p-4 font-medium text-slate-900">${item.nama || '-'} <br><span class="text-xs text-slate-400 font-mono">${item.nip || ''}</span></td>
             <td class="p-4 text-slate-600 text-sm">${item.jenis_cuti || 'Cuti Tahunan'}</td>
             <td class="p-4 text-slate-600 text-xs font-mono">${item.tanggal_mulai} s/d ${item.tanggal_selesai}</td>
             <td class="p-4 text-slate-500 text-sm max-w-xs truncate" title="${item.alasan}">${item.alasan || '-'}</td>
-            <td class="p-4">
-                <span class="px-2.5 py-1 rounded-full text-xs ${badgeStyle}">
-                    ${item.status || 'Menunggu'}
-                </span>
-            </td>
-            <td class="p-4">
-                ${item.status === 'Pending' || !item.status || item.status === 'Menunggu' ? `
-                    <div class="flex gap-2">
+            <td class="p-4 text-center">
+                ${(!item.status || item.status === 'Pending' || item.status === 'Menunggu') ? `
+                    <div class="flex gap-2 justify-center">
                         <button onclick="prosesAksiCuti('${item.id}', 'Disetujui')" class="px-2 py-1 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700 transition">Setujui</button>
                         <button onclick="prosesAksiCuti('${item.id}', 'Ditolak')" class="px-2 py-1 bg-rose-600 text-white rounded text-xs hover:bg-rose-700 transition">Tolak</button>
                     </div>
-                ` : `<span class="text-xs text-slate-400 italic">Selesai diproses</span>`}
+                ` : `<span class="px-2.5 py-1 rounded-full text-xs ${badgeStyle}">${item.status}</span>`}
             </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-// --- FUNGSI PROSES PERSETUJUAN (SUDAH DIPERBAIKI) ---
 async function prosesAksiCuti(idCuti, statusBaru) {
     if (!confirm(`Apakah Anda yakin ingin mengubah status menjadi ${statusBaru}?`)) return;
 
-    // MENGGUNAKAN NAMA TABEL ASLI ANDA: pengajuan_cuti
     const { error } = await supabaseClient
         .from('pengajuan_cuti')
         .update({ status: statusBaru })
@@ -544,9 +536,10 @@ async function prosesAksiCuti(idCuti, statusBaru) {
         alert("Gagal memproses aksi: " + error.message);
     } else {
         alert(`Pengajuan cuti berhasil di-${statusBaru.toLowerCase()}!`);
-        muatRiwayatCutiAdmin(); // Refresh tabel
+        muatRiwayatCutiAdmin();
     }
 }
+
 // --- FUNGSI EKSPOR CSV UNTUK ADMIN ---
 async function eksporCSV() {
     let { data: listAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
@@ -565,152 +558,73 @@ async function eksporCSV() {
     link.click();
     document.body.removeChild(link);
 }
-// --- MANAJEMEN CUTI KARYAWAN ---
+
+// --- MANAJEMEN CUTI KARYAWAN (DIPERBAIKI DARI YANG TERPOTONG) ---
 async function ajukanCuti(e) {
     e.preventDefault();
     const jenis = document.getElementById('cuti-jenis').value;
     const mulai = document.getElementById('cuti-mulai').value;
     const selesai = document.getElementById('cuti-selesai').value;
     const alasan = document.getElementById('cuti-alasan').value;
-    const nip = userAktif.email.split('@')[0];
+    const nipKaryawan = userAktif.email.split('@')[0];
 
-    if (new Date(mulai) > new Date(selesai)) { alert("Tanggal salah!"); return; }
-
-    await supabaseClient.from('pengajuan_cuti').insert({
-        user_id: userAktif.id, nama: userAktif.user_metadata.full_name || nip, nip: nip,
-        jenis_cuti: jenis, tanggal_mulai: mulai, tanggal_selesai: selesai, status: 'Pending', alasan: alasan
+    const { error } = await supabaseClient.from('pengajuan_cuti').insert({
+        user_id: userAktif.id,
+        nama: userAktif.user_metadata.full_name || userAktif.email.split('@')[0],
+        nip: nipKaryawan,
+        jenis_cuti: jenis,
+        tanggal_mulai: mulai,
+        tanggal_selesai: selesai,
+        alasan: alasan,
+        status: 'Pending'
     });
-    alert("Cuti berhasil diajukan!"); document.getElementById('cuti-form').reset(); muatRiwayatCutiKaryawan();
+
+    if (error) {
+        alert("Gagal mengajukan cuti: " + error.message);
+    } else {
+        alert("Pengajuan cuti sukses terkirim!");
+        document.getElementById('cuti-form').reset();
+        muatRiwayatCutiKaryawan();
+    }
 }
 
 async function muatRiwayatCutiKaryawan() {
-    let { data: listCuti } = await supabaseClient.from('pengajuan_cuti').select('*').eq('user_id', userAktif.id).order('created_at', { ascending: false });
     const tbody = document.getElementById('table-cuti-karyawan-body');
-    if(!tbody) return;
+    if (!tbody || !userAktif) return;
+
+    tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">Memuat data...</td></tr>';
+
+    let { data: listCuti, error } = await supabaseClient
+        .from('pengajuan_cuti')
+        .select('*')
+        .eq('user_id', userAktif.id)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Gagal memuat riwayat.</td></tr>';
+        return;
+    }
+
+    if (!listCuti || listCuti.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-400">Belum ada riwayat cuti.</td></tr>';
+        return;
+    }
+
     tbody.innerHTML = '';
-    
-    listCuti?.forEach(c => {
-        let badgeColor = c.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : c.status === 'Rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
+    listCuti.forEach(item => {
+        let badgeStyle = 'bg-amber-50 text-amber-700';
+        if (item.status === 'Disetujui' || item.status === 'Approved') badgeStyle = 'bg-emerald-50 text-emerald-700 font-bold';
+        if (item.status === 'Ditolak' || item.status === 'Rejected') badgeStyle = 'bg-rose-50 text-rose-700 font-bold';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td class="p-3 font-medium text-slate-700">${c.jenis_cuti}</td>
-            <td class="p-3 text-xs text-slate-500">${c.tanggal_mulai} s/d ${c.tanggal_selesai}</td>
-            <td class="p-3 text-slate-600">${c.alasan}</td>
-            <td class="p-3 flex items-center gap-2" id="wrapper-aksi-${c.id}">
-                <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor}">${c.status}</span>
-            </td>
+            <td class="p-3 font-medium text-slate-900">${item.jenis_cuti}</td>
+            <td class="p-3 text-slate-600 font-mono text-xs">${item.tanggal_mulai} s/d ${item.tanggal_selesai}</td>
+            <td class="p-3 text-slate-500">${item.alasan || '-'}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded-full text-xs ${badgeStyle}">${item.status || 'Pending'}</span></td>
         `;
         tbody.appendChild(tr);
-
-        if (c.status === 'Approved') {
-            const btn = document.createElement('button');
-            btn.className = "bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-medium px-2 py-0.5 rounded cursor-pointer";
-            btn.innerText = "Cetak Form";
-            btn.addEventListener('click', () => { eksekusiTampilanCetak(c); });
-            document.getElementById(`wrapper-aksi-${c.id}`).appendChild(btn);
-        }
     });
-}
-
-// --- FUNGSI HALAMAN CETAK DENGAN LOGO ASLI & 3 KOLOM TANDA TANGAN ---
-function eksekusiTampilanCetak(dataCuti) {
-    try {
-        const appContent = document.getElementById('app-content');
-        const areaCetak = document.createElement('div');
-        areaCetak.id = 'print-temporary-area';
-        areaCetak.className = 'bg-white p-6 text-slate-950 min-h-screen flex flex-col justify-center items-center absolute top-0 left-0 w-full z-[9999]';
-
-        const idMentah = dataCuti.id ? String(dataCuti.id) : '0';
-        const idPotong = idMentah.length > 8 ? idMentah.substring(0, 8).toUpperCase() : idMentah;
-
-        // Menggunakan file logo lokal asli "LogoDapen-1.png" yang dikirim oleh pengguna
-        const urlLogoResmi = "https://czrfgfsktsnvdwmjpzbx.supabase.co/storage/v1/object/public/aset/LogoDapen-1.png"; 
-
-        areaCetak.innerHTML = `
-            <div class="w-full max-w-2xl border border-slate-300 p-8 rounded-lg shadow-sm bg-white">
-                
-                <div class="flex items-center gap-4 border-b-2 border-slate-900 pb-4 mb-6">
-                    <div class="w-20 h-20 flex-shrink-0 flex items-center justify-center">
-                        <img src="${urlLogoResmi}" alt="Logo Dapen Bank Jateng" class="max-w-full max-h-full object-contain" onerror="this.src='LogoDapen-1.png';">
-                    </div>
-                    <div class="flex-1 text-center pr-12"> 
-                        <h1 class="text-xl font-bold uppercase text-indigo-900 tracking-wide">Dana Pensiun Bank Jateng</h1>
-                        <p class="text-xs text-slate-500 font-medium">Jl. Pemuda No. 142, Semarang, Jawa Tengah</p>
-                        <h2 class="text-md font-semibold mt-3 underline tracking-wider">SURAT IZIN CUTI KARYAWAN</h2>
-                        <p class="text-[10px] text-slate-400 font-mono mt-0.5">ID Pengajuan: #${idPotong}</p>
-                    </div>
-                </div>
-
-                <div class="space-y-4 text-sm">
-                    <p>Menerangkan bahwa permohonan cuti karyawan berikut telah <strong class="text-emerald-600">DISETUJUI</strong> oleh manajemen:</p>
-                    <table class="w-full text-left border-collapse">
-                        <tr class="border-b border-slate-100"><td class="py-2.5 w-1/3 font-semibold text-slate-600">Nama Karyawan</td><td>: ${dataCuti.nama}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2.5 font-semibold text-slate-600">NIP Pegawai</td><td>: ${dataCuti.nip || '-'}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2.5 font-semibold text-slate-600">Jenis Cuti</td><td>: ${dataCuti.jenis_cuti}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2.5 font-semibold text-slate-600">Tanggal Durasi</td><td class="font-mono">: ${dataCuti.tanggal_mulai} s/d ${dataCuti.tanggal_selesai}</td></tr>
-                        <tr class="border-b border-slate-100"><td class="py-2.5 font-semibold text-slate-600">Alasan Keperluan</td><td>: ${dataCuti.alasan}</td></tr>
-                    </table>
-                </div>
-
-                <div class="mt-16 grid grid-cols-3 gap-2 text-center text-xs">
-                    
-                    <div class="flex flex-col justify-between h-32">
-                        <p class="font-medium text-slate-500">Pemohon,</p>
-                        <div>
-                            <p class="font-bold underline text-slate-900">${dataCuti.nama}</p>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Karyawan Bersangkutan</p>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col justify-between h-32 items-center">
-                        <p class="font-medium text-slate-500">Sistem Verifikasi,</p>
-                        <div class="border border-dashed border-emerald-500 bg-emerald-50/50 rounded-lg p-2 my-auto transform -rotate-1 max-w-[140px]">
-                            <p class="text-[9px] font-bold uppercase text-emerald-700 tracking-wider">Approved by System</p>
-                            <p class="text-[7px] text-emerald-600 font-mono mt-0.5">E-ABSENSI DAPEN</p>
-                            <p class="text-[6px] text-slate-400 font-mono">ID-${idPotong}</p>
-                        </div>
-                        <div>
-                            <p class="font-bold text-emerald-600 text-[10px]">DIGITAL VERIFIED</p>
-                            <p class="text-[9px] text-slate-400">Otomatis Terbuku</p>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col justify-between h-32">
-                        <p class="font-medium text-slate-500">Semarang, .........................<br>Pejabat Yang Membidangi,</p>
-                        <div>
-                            <p class="font-bold underline text-slate-900">_____________________</p>
-                            <p class="text-[10px] text-slate-400 mt-0.5">NIP. .................................</p>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="mt-12 pt-4 border-t border-slate-200 text-center flex justify-center gap-2 style-print-hidden">
-                    <button id="real-print-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-medium cursor-pointer shadow-sm">🖨️ Cetak / Simpan PDF</button>
-                    <button id="real-close-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-medium cursor-pointer">Kembali ke Aplikasi</button>
-                </div>
-            </div>
-            <style>
-                @media print { 
-                    .style-print-hidden { display: none !important; } 
-                    body { background: white; } 
-                    .border-dashed { border-style: dashed !important; }
-                }
-            </style>
-        `;
-
-        appContent.classList.add('hidden');
-        document.body.appendChild(areaCetak);
-
-        document.getElementById('real-print-btn').onclick = function() { window.print(); };
-        document.getElementById('real-close-btn').onclick = function() {
-            areaCetak.remove();
-            appContent.classList.remove('hidden');
-        };
-    } catch (e) { 
-        console.error(e);
-        alert("Gagal memuat lembar cetak."); 
-    }
 }
     </script>
 </body>
