@@ -687,132 +687,115 @@ async function muatRiwayatCutiKaryawan() {
     lucide.createIcons();
 }
 
-// --- FUNGSI GENERATOR SURAT CUTI FORMAL & PROSES PRINT (FIX ERROR SUBSTRING) ---
+// --- FUNGSI CETAK YANG SEPENUHNYA MENDUKUNG TAMPILAN HP & LAPTOP ---
 async function aksiCetakFormulir(idCuti) {
     try {
         const { data, error } = await supabaseClient.from('pengajuan_cuti').select('*').eq('id', idCuti).single();
-        if (error || !data) { 
-            alert("Data gagal diambil untuk dicetak!"); 
-            return; 
-        }
+        if (error || !data) { alert("Data gagal diambil untuk dicetak!"); return; }
 
         const printArea = document.getElementById('print-area');
-        if (!printArea) {
-            alert("Elemen #print-area tidak ditemukan di halaman ini!");
-            return;
-        }
+        if (!printArea) { alert("Elemen #print-area tidak ditemukan!"); return; }
         
-        // Perbaikan: Konversi data.id menjadi String agar tidak crash
         const idTeks = String(data.id);
         const refID = idTeks.length > 8 ? idTeks.substring(0,8).toUpperCase() : idTeks.toUpperCase();
         
-        // Desain template surat resmi modern dan bersih
-        printArea.innerHTML = `
-            <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; padding: 20px;">
-                
-                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 35px;">
-                    <div style="display: flex; align-items: center; gap: 16px;">
-                        <img src="https://czrfgfsktsnvdwmjpzbx.supabase.co/storage/v1/object/public/aset/LogoDapen-1.png" alt="Logo Dapen" style="width: 55px; height: auto; object-fit: contain;">
+        // Cek apakah user menggunakan handphone/tablet
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // Template Struktur Formulir Modern
+        const isiFormulirHtml = `
+            <div id="close-print-btn" style="display: ${isMobile ? 'block' : 'none'}; text-align: right; margin-bottom: 20px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+                <button onclick="tutupPratinjauCetak()" style="background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer;">✕ Tutup Pratinjau</button>
+            </div>
+
+            <div style="font-family: 'Inter', -apple-system, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; padding: 15px; background: #fff;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <img src="https://czrfgfsktsnvdwmjpzbx.supabase.co/storage/v1/object/public/aset/LogoDapen-1.png" alt="Logo" style="width: 45px; height: auto;">
                         <div>
-                            <h2 style="margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #0f172a;">Dana Pensiun Bank Jateng</h2>
-                            <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b; line-height: 1.4;">Jl.Ki Mangunsarkoro No.25, Semarang Tengah, Kota Semarang, Jawa Tengah 50132</p>
+                            <h2 style="margin: 0; font-size: 15px; font-weight: 800; text-transform: uppercase; color: #0f172a;">Dana Pensiun Bank Jateng</h2>
+                            <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Jl. Pemuda No.142, Semarang Tengah, Kota Semarang</p>
                         </div>
                     </div>
-                    <div style="text-align: right;">
-                        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #4f46e5; background: #e0e7ff; padding: 4px 10px; border-radius: 20px;">Dokumen Digital</span>
-                    </div>
                 </div>
                 
-                <div style="text-align: center; margin-bottom: 35px;">
-                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #0f172a;">Surat Izin / Persetujuan Cuti</h3>
-                    <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748b; font-family: monospace;">Ref ID: ${refID}-${data.nip || 'REG'}</p>
+                <div style="text-align: center; margin-bottom: 25px;">
+                    <h3 style="margin: 0; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Surat Izin / Persetujuan Cuti</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b; font-family: monospace;">Ref ID: ${refID}</p>
                 </div>
                 
-                <p style="margin-bottom: 20px; font-size: 13px; line-height: 1.6; color: #334155;">Menerangkan bahwa permohonan pengajuan cuti yang diajukan oleh karyawan di bawah ini:</p>
-                
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                        <tr>
-                            <td style="width: 28%; padding: 8px 0; color: #64748b; font-weight: 500;">Nama Karyawan</td>
-                            <td style="width: 2%; padding: 8px 0; color: #64748b;">:</td>
-                            <td style="padding: 8px 0; font-weight: 600; color: #0f172a; font-size: 14px;">${data.nama}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">NIP / Nomor Urut</td>
-                            <td style="padding: 8px 0; color: #64748b;">:</td>
-                            <td style="padding: 8px 0; font-family: monospace; font-weight: 600; color: #334155;">${data.nip || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Jenis Cuti</td>
-                            <td style="padding: 8px 0; color: #64748b;">:</td>
-                            <td style="padding: 8px 0; font-weight: 600; color: #4f46e5;">${data.jenis_cuti}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Waktu Pelaksanaan</td>
-                            <td style="padding: 8px 0; color: #64748b;">:</td>
-                            <td style="padding: 8px 0; font-weight: 600; color: #0f172a;">${data.tanggal_mulai} <span style="color: #94a3b8; font-weight: 400;">s/d</span> ${data.tanggal_selesai}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; color: #64748b; font-weight: 500; vertical-align: top;">Alasan Pengajuan</td>
-                            <td style="padding: 8px 0; color: #64748b; vertical-align: top;">:</td>
-                            <td style="padding: 8px 0; color: #475569; line-height: 1.5; font-style: italic;">"${data.alasan || '-'}"</td>
-                        </tr>
-                    </table>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 12px;">
+                    <p style="margin: 6px 0;"><b>Nama Karyawan:</b> ${data.nama}</p>
+                    <p style="margin: 6px 0;"><b>NIP / Nomor:</b> ${data.nip || '-'}</p>
+                    <p style="margin: 6px 0;"><b>Jenis Cuti:</b> <span style="color: #4f46e5; font-weight: 600;">${data.jenis_cuti}</span></p>
+                    <p style="margin: 6px 0;"><b>Waktu:</b> ${data.tanggal_mulai} s/d ${data.tanggal_selesai}</p>
+                    <p style="margin: 6px 0; font-style: italic; color: #475569;">"Alasan: ${data.alasan || '-'}"</p>
                 </div>
                 
-                <p style="text-align: justify; margin-bottom: 45px; font-size: 13px; line-height: 1.6; color: #334155;">
-                    Telah diperiksa dan dinyatakan <span style="font-weight: 700; color: #10b981;">Disetujui</span> untuk melaksanakan cuti sesuai dengan regulasi operasional Dana Pensiun Bank Jateng yang berlaku. Karyawan yang bersangkutan diwajibkan untuk kembali aktif bertugas tepat waktu setelah masa cuti berakhir.
+                <p style="text-align: justify; margin-bottom: 35px; font-size: 12px; line-height: 1.5;">
+                    Telah diperiksa dan dinyatakan <span style="font-weight: 700; color: #10b981;">Disetujui</span> sesuai dengan regulasi operasional Dana Pensiun Bank Jateng.
                 </p>
                 
-                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 20px; gap: 15px;">
-                    
-                    <div style="text-align: center; width: 30%;">
-                        <p style="color: #64748b; margin-bottom: 55px; font-weight: 500;">Pemohon Cuti,</p>
-                        <div>
-                            <p style="font-weight: 700; color: #0f172a; margin: 0; font-size: 13px;">${data.nama}</p>
-                            <p style="font-size: 11px; color: #94a3b8; margin: 2px 0 0 0; font-family: monospace;">NIP. ${data.nip || '-'}</p>
-                        </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; gap: 10px;">
+                    <div style="text-align: center; width: 32%;">
+                        <p style="color: #64748b; margin-bottom: 40px;">Pemohon Cuti,</p>
+                        <p style="font-weight: 700; margin: 0;">${data.nama}</p>
                     </div>
-                    
-                    <div style="text-align: center; width: 34%; border: 1px dashed #cbd5e1; padding: 12px; background-color: #f8fafc; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box;">
-                        <p style="margin: 0 0 6px 0; font-size: 9px; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">E-Signature Verification</p>
-                        
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="#10b981" style="width: 28px; height: 28px; margin: 4px 0; display: block; margin-left: auto; margin-right: auto;">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        
-                        <div style="color: #10b981; font-weight: 800; font-size: 12px; letter-spacing: 0.5px; margin-bottom: 4px;">SYSTEM APPROVED</div>
-                        <p style="font-size: 9px; color: #64748b; font-style: italic; margin: 0; line-height: 1.3;">
-                            Valid via e-Absensi pada<br>${new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}
-                        </p>
+                    <div style="text-align: center; width: 34%; border: 1px dashed #cbd5e1; padding: 8px; background: #f8fafc; border-radius: 6px;">
+                        <span style="font-size: 8px; color: #94a3b8; font-weight: 700;">SYSTEM VERIFIED</span>
+                        <div style="color: #10b981; font-weight: 800; font-size: 11px; margin: 4px 0;">✓ APPROVED</div>
+                        <p style="font-size: 8px; color: #64748b; margin: 0;">e-Absensi Dapen</p>
                     </div>
-                    
-                    <div style="text-align: center; width: 30%;">
-                        <p style="color: #64748b; margin-bottom: 55px; font-weight: 500;">Semarang, ${new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}<br>Atasan yang Membidangi,</p>
-                        <div>
-                            <div style="width: 80%; border-bottom: 1px dashed #cbd5e1; margin: 0 auto 4px auto;"></div>
-                            <p style="font-weight: 700; color: #0f172a; margin: 0; font-size: 13px;">......................</p>
-                            <p style="font-size: 10px; color: #94a3b8; margin: 2px 0 0 0;">Otorisasi Fisik / Basah</p>
-                        </div>
+                    <div style="text-align: center; width: 32%;">
+                        <p style="color: #64748b; margin-bottom: 40px;">Pejabat Berwenang,</p>
+                        <p style="font-weight: 700; margin: 0;">Direksi / Kepala SDM</p>
                     </div>
-                    
                 </div>
             </div>
         `;
         
-        // Paksa tampilkan area cetak
-        printArea.style.setProperty('display', 'block', 'important');
-        printArea.classList.remove('hidden');
-        
-        // Beri jeda render singkat agar stabil, lalu cetak
-        setTimeout(() => {
-            window.print();
-            printArea.style.setProperty('display', 'none', 'important');
-            printArea.classList.add('hidden');
-        }, 150);
+        printArea.innerHTML = isiFormulirHtml;
+
+        if (isMobile) {
+            // JIKA DI HP: Buat tampilan layar penuh (Modal Pratinjau) agar karyawan bisa melihat & screenshot formulirnya
+            printArea.style.all = 'unset'; 
+            printArea.style.position = 'fixed';
+            printArea.style.top = '0';
+            printArea.style.left = '0';
+            printArea.style.width = '100vw';
+            printArea.style.height = '100vh';
+            printArea.style.backgroundColor = '#ffffff';
+            printArea.style.zIndex = '99999';
+            printArea.style.overflowY = 'auto';
+            printArea.style.padding = '10px';
+            printArea.style.boxSizing = 'border-box';
+            printArea.style.display = 'block';
+            printArea.classList.remove('hidden');
+            
+            // Picu dialog cetak bawaan hp secara otomatis setelah render modal selesai
+            setTimeout(() => { window.print(); }, 300);
+        } else {
+            // JIKA DI LAPTOP/KOMPUTER: Jalankan mekanisme cetak langsung seperti biasa
+            printArea.style.setProperty('display', 'block', 'important');
+            printArea.classList.remove('hidden');
+            setTimeout(() => {
+                window.print();
+                printArea.style.setProperty('display', 'none', 'important');
+                printArea.classList.add('hidden');
+            }, 150);
+        }
 
     } catch (err) {
         alert("Terjadi kesalahan sistem cetak: " + err.message);
+    }
+}
+
+// Fungsi pembantu untuk menutup layar pratinjau di Handphone
+function tutupPratinjauCetak() {
+    const printArea = document.getElementById('print-area');
+    if (printArea) {
+        printArea.style.display = 'none';
+        printArea.classList.add('hidden');
     }
 }
     </script>
