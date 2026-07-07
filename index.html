@@ -438,13 +438,60 @@ function prosesAbsen(jenis) {
 async function muatStatusHariIni() {
     if (!userAktif) return;
     const sekarang = new Date();
+    // Format tanggal lokal (YYYY-MM-DD) sesuai zona waktu user saat ini
     const tgl = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0];
-    let { data } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', tgl).maybeSingle();
     
-    if(document.getElementById('today-masuk')) document.getElementById('today-masuk').innerText = data?.jam_masuk || '-';
-    if(document.getElementById('today-pulang')) document.getElementById('today-pulang').innerText = data?.jam_pulang || '-';
-}
+    // 1. Ambil data absensi harian jika ada
+    let { data: dataAbsen } = await supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', tgl).maybeSingle();
+    
+    if(document.getElementById('today-masuk')) document.getElementById('today-masuk').innerText = dataAbsen?.jam_masuk || '-';
+    if(document.getElementById('today-pulang')) document.getElementById('today-pulang').innerText = dataAbsen?.jam_pulang || '-';
 
+    // 2. PROTEKSI TOMBOL: Cek apakah karyawan ini sedang dalam masa cuti yang disetujui hari ini
+    let { data: dataCuti } = await supabaseClient.from('pengajuan_cuti')
+        .select('*')
+        .eq('user_id', userAktif.id)
+        .lte('tanggal_mulai', tgl)
+        .gte('tanggal_selesai', tgl)
+        .or('status.eq.Disetujui,status.eq.Approved');
+
+    const btnMasuk = document.getElementById('btn-absen-masuk');
+    const btnPulang = document.getElementById('btn-absen-pulang');
+
+    // Jika ditemukan data cuti yang aktif hari ini
+    if (dataCuti && dataCuti.length > 0) {
+        if (btnMasuk) {
+            btnMasuk.disabled = true;
+            btnMasuk.className = "bg-slate-300 text-slate-500 p-5 rounded-2xl shadow-sm transition flex flex-col items-center justify-center gap-2 cursor-not-allowed opacity-60";
+            btnMasuk.innerHTML = `<i data-lucide="calendar-off" class="w-8 h-8"></i><span class="font-semibold text-lg">Absen Terkunci</span><span class="text-xs">Anda Sedang Cuti</span>`;
+        }
+        if (btnPulang) {
+            btnPulang.disabled = true;
+            btnPulang.className = "bg-slate-300 text-slate-500 p-5 rounded-2xl shadow-sm transition flex flex-col items-center justify-center gap-2 cursor-not-allowed opacity-60";
+            btnPulang.innerHTML = `<i data-lucide="calendar-off" class="w-8 h-8"></i><span class="font-semibold text-lg">Absen Terkunci</span><span class="text-xs">Anda Sedang Cuti</span>`;
+        }
+        
+        // Ubah status info di bawah menjadi keterangan cuti
+        const locStatus = document.getElementById('location-status');
+        if (locStatus) locStatus.innerHTML = `<span class="text-indigo-600 font-bold">Hari ini Anda dibebastugaskan karena masa: ${dataCuti[0].jenis_cuti}</span>`;
+        
+        // Perbarui ikon Lucide yang baru disuntikkan
+        lucide.createIcons();
+    } else {
+        // Jika tidak cuti, kembalikan tombol ke fungsi desain normal semula
+        if (btnMasuk && !dataAbsen?.jam_masuk) {
+            btnMasuk.disabled = false;
+            btnMasuk.className = "bg-emerald-600 hover:bg-emerald-700 text-white p-5 rounded-2xl shadow-sm transition flex flex-col items-center justify-center gap-2 active:scale-95";
+            btnMasuk.innerHTML = `<i data-lucide="log-in" class="w-8 h-8"></i><span class="font-semibold text-lg">Absen Masuk</span><span class="text-xs text-emerald-100">Batas: 07:30 WIB</span>`;
+        }
+        if (btnPulang) {
+            btnPulang.disabled = false;
+            btnPulang.className = "bg-rose-600 hover:bg-rose-700 text-white p-5 rounded-2xl shadow-sm transition flex flex-col items-center justify-center gap-2 active:scale-95";
+            btnPulang.innerHTML = `<i data-lucide="log-out" class="w-8 h-8"></i><span class="font-semibold text-lg">Absen Pulang</span><span class="text-xs text-rose-100">Mulai: 16:30 WIB</span>`;
+        }
+        lucide.createIcons();
+    }
+}
 // --- MANAJEMEN ADMIN: MUAT RIWAYAT ABSENSI ---
 async function muatRiwayatAbsenAdmin() {
     const tbody = document.getElementById('table-body');
