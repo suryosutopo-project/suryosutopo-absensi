@@ -392,30 +392,45 @@ function prosesAbsen(jenis) {
     const formatTanggal = new Date(sekarang.getTime() - (sekarang.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0]; 
     const formatJam = `${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`;
 
-    supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', formatTanggal).maybeSingle()
-    .then(({ data: dataHariIni }) => {
-        if (dataHariIni && dataHariIni.status === 'Cuti') { alert("Anda sedang Cuti hari ini."); return; }
-        dapatkanLokasi(async (koordinat) => {
-            const fotoBlob = await tangkapGambarDariKamera();
-            if (!fotoBlob) { alert("Gagal ambil foto."); return; }
-            const namaFile = `${userAktif.id}_${formatTanggal}_${jenis.toLowerCase()}.jpg`;
-            
-            await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { upsert: true });
-            const { data: urlData } = supabaseClient.storage.from('foto-absen').getPublicUrl(namaFile);
+    // 1. Cek dulu apakah hari ini karyawan memiliki cuti yang sudah disetujui (Approved / Disetujui)
+    supabaseClient.from('pengajuan_cuti')
+    .select('*')
+    .eq('user_id', userAktif.id)
+    .lte('tanggal_mulai', formatTanggal)
+    .gte('tanggal_selesai', formatTanggal)
+    .or('status.eq.Disetujui,status.eq.Approved')
+    .maybeSingle()
+    .then(({ data: dataCuti }) => {
+        if (dataCuti) { 
+            alert(`Anda tidak bisa absen. Hari ini Anda sedang dalam masa: ${dataCuti.jenis_cuti} (Status: Disetujui)`); 
+            return; 
+        }
 
-            if (jenis === 'Masuk') {
-                if (dataHariIni?.jam_masuk) { alert("Sudah absen masuk!"); return; }
-                let status = (sekarang.getHours() > BATAS_JAM_MASUK || (sekarang.getHours() === BATAS_JAM_MASUK && sekarang.getMinutes() > BATAS_MENIT_MASUK)) ? 'Terlambat' : 'Tepat Waktu';
-                await supabaseClient.from('absensi').insert({
-                    user_id: userAktif.id, nama: userAktif.user_metadata.full_name || userAktif.email.split('@')[0],
-                    tanggal: formatTanggal, jam_masuk: formatJam, status: status, lokasi: koordinat, foto_url: urlData.publicUrl
-                });
-            } else {
-                if (!dataHariIni) { alert("Belum absen masuk!"); return; }
-                if (dataHariIni.jam_pulang) { alert("Sudah absen pulang!"); return; }
-                await supabaseClient.from('absensi').update({ jam_pulang: formatJam, foto_url: urlData.publicUrl }).eq('id', dataHariIni.id);
-            }
-            alert(`Absen ${jenis} Sukses!`); muatStatusHariIni();
+        // 2. Jika tidak cuti, lanjutkan cek absensi harian seperti biasa
+        supabaseClient.from('absensi').select('*').eq('user_id', userAktif.id).eq('tanggal', formatTanggal).maybeSingle()
+        .then(({ data: dataHariIni }) => {
+            dapatkanLokasi(async (koordinat) => {
+                const fotoBlob = await tangkapGambarDariKamera();
+                if (!fotoBlob) { alert("Gagal ambil foto."); return; }
+                const namaFile = `${userAktif.id}_${formatTanggal}_${jenis.toLowerCase()}.jpg`;
+                
+                await supabaseClient.storage.from('foto-absen').upload(namaFile, fotoBlob, { upsert: true });
+                const { data: urlData } = supabaseClient.storage.from('foto-absen').getPublicUrl(namaFile);
+
+                if (jenis === 'Masuk') {
+                    if (dataHariIni?.jam_masuk) { alert("Sudah absen masuk!"); return; }
+                    let status = (sekarang.getHours() > BATAS_JAM_MASUK || (sekarang.getHours() === BATAS_JAM_MASUK && sekarang.getMinutes() > BATAS_MENIT_MASUK)) ? 'Terlambat' : 'Tepat Waktu';
+                    await supabaseClient.from('absensi').insert({
+                        user_id: userAktif.id, nama: userAktif.user_metadata.full_name || userAktif.email.split('@')[0],
+                        tanggal: formatTanggal, jam_masuk: formatJam, status: status, lokasi: koordinat, foto_url: urlData.publicUrl
+                    });
+                } else {
+                    if (!dataHariIni) { alert("Belum absen masuk!"); return; }
+                    if (dataHariIni.jam_pulang) { alert("Sudah absen pulang!"); return; }
+                    await supabaseClient.from('absensi').update({ jam_pulang: formatJam, foto_url: urlData.publicUrl }).eq('id', dataHariIni.id);
+                }
+                alert(`Absen ${jenis} Sukses!`); muatStatusHariIni();
+            });
         });
     });
 }
@@ -434,37 +449,92 @@ async function muatStatusHariIni() {
 async function muatRiwayatAbsenAdmin() {
     const tbody = document.getElementById('table-body');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Memuat data absensi...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Memuat data absensi & cuti...</td></tr>';
 
-    let { data: listAbsen, error } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
-    if (error) { tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Gagal: ${error.message}</td></tr>`; return; }
-    if (!listAbsen || listAbsen.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada data absensi.</td></tr>'; return; }
+    // Ambil data absensi dan data cuti secara bersamaan
+    let { data: listAbsen, error: errAbsen } = await supabaseClient.from('absensi').select('*').order('tanggal', { ascending: false });
+    let { data: listCuti, error: errCuti } = await supabaseClient.from('pengajuan_cuti').select('*').or('status.eq.Disetujui,status.eq.Approved');
 
+    if (errAbsen) { tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Gagal: ${errAbsen.message}</td></tr>`; return; }
+    
     tbody.innerHTML = '';
-    listAbsen.forEach(absen => {
+    let gabunganData = [];
+
+    // Masukkan data absen riil ke dalam list tracker
+    if (listAbsen) {
+        listAbsen.forEach(a => {
+            gabunganData.push({
+                nama: a.nama,
+                tanggal: a.tanggal,
+                jam_masuk: a.jam_masuk,
+                jam_pulang: a.jam_pulang,
+                foto_url: a.foto_url,
+                status: a.status,
+                key: `${a.user_id}_${a.tanggal}`
+            });
+        });
+    }
+
+    // Buat generator otomatis untuk tanggal cuti agar tampil di riwayat absen
+    if (listCuti) {
+        listCuti.forEach(c => {
+            let start = new Date(c.tanggal_mulai);
+            let end = new Date(c.tanggal_selesai);
+            
+            // Loping memecah rentang tanggal cuti menjadi harian
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                let formatTglCuti = new Date(d.getTime() - (d.getTimezoneOffset() * 60 * 1000)).toISOString().split('T')[0];
+                let checkKey = `${c.user_id}_${formatTglCuti}`;
+                
+                // Cari apakah sudah ada baris absen di tanggal tersebut. Jika belum ada, suntikkan baris "Cuti Otomatis"
+                let sudahAbsen = gabunganData.some(g => g.key === checkKey);
+                if (!sudahAbsen) {
+                    gabunganData.push({
+                        nama: c.nama,
+                        tanggal: formatTglCuti,
+                        jam_masuk: '-',
+                        jam_pulang: '-',
+                        foto_url: null,
+                        status: 'Cuti',
+                        key: checkKey
+                    });
+                }
+            }
+        });
+    }
+
+    // Urutkan riwayat gabungan berdasarkan tanggal terbaru
+    gabunganData.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+
+    if (gabunganData.length === 0) { 
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada data absensi/cuti.</td></tr>'; 
+        return; 
+    }
+
+    // Render baris ke dalam tabel HTML admin
+    gabunganData.forEach(item => {
         let statusColor = 'bg-slate-100 text-slate-700';
-        if (absen.status === 'Tepat Waktu') statusColor = 'bg-emerald-50 text-emerald-700 font-semibold';
-        if (absen.status === 'Terlambat') statusColor = 'bg-amber-50 text-amber-700 font-semibold';
-        if (absen.status === 'Cuti') statusColor = 'bg-indigo-50 text-indigo-700 font-semibold';
+        if (item.status === 'Tepat Waktu') statusColor = 'bg-emerald-50 text-emerald-700 font-semibold';
+        if (item.status === 'Terlambat') statusColor = 'bg-amber-50 text-amber-700 font-semibold';
+        if (item.status === 'Cuti') statusColor = 'bg-indigo-100 text-indigo-700 font-bold';
 
         let komponenFoto = '<span class="text-xs text-slate-400 italic">Tidak ada foto</span>';
-        if (absen.foto_url) komponenFoto = `<a href="${absen.foto_url}" target="_blank" class="text-xs text-indigo-600 font-medium hover:underline">Lihat Foto</a>`;
+        if (item.foto_url) komponenFoto = `<a href="${item.foto_url}" target="_blank" class="text-xs text-indigo-600 font-medium hover:underline">Lihat Foto</a>`;
 
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50/80 transition";
         tr.innerHTML = `
-            <td class="p-4 font-medium text-slate-900">${absen.nama || '-'}</td>
-            <td class="p-4 text-slate-600 font-mono text-xs">${absen.tanggal}</td>
-            <td class="p-4 text-emerald-600 font-semibold">${absen.jam_masuk || '-'}</td>
-            <td class="p-4 text-rose-600 font-semibold">${absen.jam_pulang || '-'}</td>
+            <td class="p-4 font-medium text-slate-900">${item.nama || '-'}</td>
+            <td class="p-4 text-slate-600 font-mono text-xs">${item.tanggal}</td>
+            <td class="p-4 ${item.status === 'Cuti' ? 'text-indigo-600 italic font-medium' : 'text-emerald-600 font-semibold'}">${item.jam_masuk || '-'}</td>
+            <td class="p-4 ${item.status === 'Cuti' ? 'text-indigo-600 italic font-medium' : 'text-rose-600 font-semibold'}">${item.jam_pulang || '-'}</td>
             <td class="p-4">${komponenFoto}</td>
-            <td class="p-4"><span class="px-2 py-0.5 rounded-full text-xs ${statusColor}">${absen.status}</span></td>
+            <td class="p-4"><span class="px-2 py-0.5 rounded-full text-xs ${statusColor}">${item.status}</span></td>
         `;
         tbody.appendChild(tr);
     });
     lucide.createIcons();
 }
-
 // --- MANAJEMEN ADMIN: MUAT RIWAYAT PERSETUJUAN CUTI ---
 async function muatRiwayatCutiAdmin() {
     const tbody = document.getElementById('table-cuti-admin-body');
